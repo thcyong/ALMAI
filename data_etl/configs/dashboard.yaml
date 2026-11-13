@@ -1,0 +1,18 @@
+dataset: dashboard
+mapping_file: dashboard_field_mapping.csv
+
+table:
+  name: dbo.BankAnalyzingWatches
+  alias: w
+
+  join:
+    - name: dbo.DashboardItems
+      alias: d
+      on: [w.DashboardID, d.ID]
+
+  bank_id: w.BankID
+  as_of_date: w.Asof
+  date_format: datetime
+
+  where:
+    w.RevisionID: 0

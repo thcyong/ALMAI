@@ -1,0 +1,5 @@
+{
+  "python.analysis.extraPaths": ["d:/python/ALMAI/data_etl/src"],
+  "python.autoComplete.extraPaths": ["d:/python/ALMAI/data_etl/src"],
+  "python.terminal.executeInFileDir": true
+}

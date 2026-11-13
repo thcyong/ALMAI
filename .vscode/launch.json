@@ -1,0 +1,85 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "ontology: validate (offline)",
+      "type": "python",
+      "request": "launch",
+      "module": "ontology",
+      "args": ["validate"],
+      "cwd": "${workspaceFolder}",
+      "env": { "PYTHONPATH": "${workspaceFolder}" },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "ontology: validate (check-db)",
+      "type": "python",
+      "request": "launch",
+      "module": "ontology",
+      "args": ["validate", "--check-db"],
+      "cwd": "${workspaceFolder}",
+      "env": { "PYTHONPATH": "${workspaceFolder}" },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "ontology: concept ALM.NII.BASE",
+      "type": "python",
+      "request": "launch",
+      "module": "ontology",
+      "args": ["concept", "ALM.NII.BASE"],
+      "cwd": "${workspaceFolder}",
+      "env": { "PYTHONPATH": "${workspaceFolder}" },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "ontology: mapping ALM.NII.BASE",
+      "type": "python",
+      "request": "launch",
+      "module": "ontology",
+      "args": ["mapping", "ALM.NII.BASE"],
+      "cwd": "${workspaceFolder}",
+      "env": { "PYTHONPATH": "${workspaceFolder}" },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "ontology: run tests (pytest)",
+      "type": "python",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["ontology/tests", "-v"],
+      "cwd": "${workspaceFolder}",
+      "env": { "PYTHONPATH": "${workspaceFolder}" },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "financial_query: query ALM.NII.BASE",
+      "type": "python",
+      "request": "launch",
+      "module": "financial_query",
+      "args": ["--concept", "ALM.NII.BASE", "--bank-id", "-48858", "--as-of-date", "2026-06-30"],
+      "cwd": "${workspaceFolder}",
+      "env": { "PYTHONPATH": "${workspaceFolder}" },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "financial_query: query ALM.NII.U200",
+      "type": "python",
+      "request": "launch",
+      "module": "financial_query",
+      "args": ["--concept", "ALM.NII.U200", "--bank-id", "-48858", "--as-of-date", "2026-06-30"],
+      "cwd": "${workspaceFolder}",
+      "env": { "PYTHONPATH": "${workspaceFolder}" },
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "financial_query: run tests (pytest)",
+      "type": "python",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["financial_query/tests", "-v"],
+      "cwd": "${workspaceFolder}",
+      "env": { "PYTHONPATH": "${workspaceFolder}" },
+      "console": "integratedTerminal"
+    }
+  ]
+}

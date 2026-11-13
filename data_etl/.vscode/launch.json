@@ -1,0 +1,47 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "bank-etl debug (F5, run debug_run.py)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "d:/python/ALMAI/data_etl/debug_run.py",
+      "cwd": "d:/python/ALMAI/data_etl",
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
+      "name": "bank-etl sync (debug)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "bank_etl.cli",
+      "args": ["sync", "--bank-id", "-48858", "--as-of-date", "2026-06-30"],
+      "cwd": "d:/python/ALMAI/data_etl",
+      "env": {"PYTHONPATH": "d:/python/ALMAI/data_etl/src"},
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
+      "name": "bank-etl inspect-source (debug)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "bank_etl.cli",
+      "args": ["inspect-source"],
+      "cwd": "d:/python/ALMAI/data_etl",
+      "env": {"PYTHONPATH": "d:/python/ALMAI/data_etl/src"},
+      "console": "integratedTerminal",
+      "justMyCode": false
+    },
+    {
+      "name": "bank-etl show (debug)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "bank_etl.cli",
+      "args": ["show", "--bank-id", "-48858", "--as-of-date", "2026-06-30"],
+      "cwd": "d:/python/ALMAI/data_etl",
+      "env": {"PYTHONPATH": "d:/python/ALMAI/data_etl/src"},
+      "console": "integratedTerminal",
+      "justMyCode": false
+    }
+  ]
+}

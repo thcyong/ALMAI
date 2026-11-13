@@ -1,0 +1,9 @@
+{
+    "python-envs.defaultEnvManager": "ms-python.python:conda",
+    "python-envs.defaultPackageManager": "ms-python.python:conda",
+    "python.languageServer": "Pylance",
+    "python.analysis.typeCheckingMode": "off",
+    "python.analysis.diagnosticMode": "openFilesOnly",
+    "python.analysis.extraPaths": ["d:/python/ALMAI/data_etl/src"],
+    "python.autoComplete.extraPaths": ["d:/python/ALMAI/data_etl/src"]
+}

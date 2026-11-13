@@ -1,0 +1,38 @@
+# Layer 2 Semantic Mapping: Financial Concept -> PostgreSQL target.
+#
+# Each mapping associates a stable Concept ID (defined in banking.ttl) with a
+# concrete PostgreSQL schema.table, column and optional equality filters.
+# No SQL is ever concatenated from this file; the Query Service in the next
+# phase will build parameterized queries from these declared targets.
+#
+# Adding a new financial concept only requires a new entry here plus a Concept
+# in banking.ttl -- no Python code change is needed.
+
+source_dataset: dashboard
+
+concepts:
+  ALM.NII.BASE:
+    table: risk.interest_rate_scenario
+    column: nii
+    filters:
+      scenario_code: Base
+
+  ALM.NII.U200:
+    table: risk.interest_rate_scenario
+    column: nii
+    filters:
+      scenario_code: U200
+
+  ALM.EVE.BASE:
+    table: risk.interest_rate_scenario
+    column: eve
+    filters:
+      scenario_code: Base
+
+  FIN.ROA:
+    table: finance.earnings
+    column: roa
+
+  CAP.TIER1:
+    table: finance.capital
+    column: tier1

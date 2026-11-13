@@ -1,0 +1,109 @@
+# ALMAI Lightweight Financial Ontology (Phase 3)
+#
+# SKOS-based concept taxonomy. This file defines ONLY financial concepts and
+# their semantic relations (broader / narrower / related). It deliberately does
+# NOT contain any PostgreSQL table/column knowledge -- that lives in
+# mappings.yaml (Layer 2 Semantic Mapping).
+#
+# Concept IDs are stable business identifiers (e.g. ALM.NII.BASE). They are
+# mapped to a stable URI under the almc: namespace and never change even if the
+# underlying database table/column names change.
+
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix dct:  <http://purl.org/dc/terms/> .
+@prefix onto: <https://almai.example/ontology/ontology.ttl#> .
+@prefix almc: <https://almai.example/ontology/concept/> .
+
+# ---------------------------------------------------------------------------
+# Layer 1 top-level domains (classification, NOT physical foreign keys)
+# ---------------------------------------------------------------------------
+
+almc:Banking a skos:Concept ;
+    skos:prefLabel "Banking"@en ;
+    skos:definition "Top-level ALMAI banking financial domain encompassing finance, risk and analysis."@en ;
+    onto:domain "Banking" ;
+    onto:definitionStatus "confirmed" .
+
+almc:Finance a skos:Concept ;
+    skos:prefLabel "Finance"@en ;
+    skos:altLabel "Financial"@en ;
+    skos:definition "Bank financial position: earnings, capital, funding and balance sheet."@en ;
+    skos:broader almc:Banking ;
+    onto:domain "Finance" ;
+    onto:definitionStatus "confirmed" .
+
+almc:Earnings a skos:Concept ;
+    skos:prefLabel "Earnings"@en ;
+    skos:definition "Bank profitability and earnings metrics."@en ;
+    skos:broader almc:Finance ;
+    onto:domain "Earnings" ;
+    onto:definitionStatus "confirmed" .
+
+almc:Capital a skos:Concept ;
+    skos:prefLabel "Capital"@en ;
+    skos:definition "Bank capital adequacy metrics."@en ;
+    skos:broader almc:Finance ;
+    onto:domain "Capital" ;
+    onto:definitionStatus "confirmed" .
+
+almc:Risk a skos:Concept ;
+    skos:prefLabel "Risk"@en ;
+    skos:definition "Bank risk exposures."@en ;
+    skos:broader almc:Banking ;
+    onto:domain "Risk" ;
+    onto:definitionStatus "confirmed" .
+
+almc:InterestRateRisk a skos:Concept ;
+    skos:prefLabel "Interest Rate Risk"@en ;
+    skos:altLabel "IRR"@en, "ALM Risk"@en ;
+    skos:definition "Exposure to changes in interest rates, including scenario-based forecast NII and Economic Value of Equity (EVE)."@en ;
+    skos:broader almc:Risk ;
+    onto:domain "Interest Rate Risk" ;
+    onto:definitionStatus "confirmed" .
+
+# ---------------------------------------------------------------------------
+# Phase 3 core financial concepts
+# ---------------------------------------------------------------------------
+
+almc:ALM.NII.BASE a skos:Concept ;
+    skos:prefLabel "Base Forecast NII"@en ;
+    skos:altLabel "Base NII"@en, "Baseline Net Interest Income"@en ;
+    skos:definition "Base scenario forecast net interest income. This is a forward-looking forecast, NOT realized/booked financial NII."@en ;
+    skos:broader almc:InterestRateRisk ;
+    skos:related almc:ALM.EVE.BASE, almc:ALM.NII.U200 ;
+    onto:domain "Interest Rate Risk" ;
+    onto:definitionStatus "confirmed" .
+
+almc:ALM.NII.U200 a skos:Concept ;
+    skos:prefLabel "U200 Forecast NII"@en ;
+    skos:altLabel "U200 NII"@en ;
+    skos:definition "U200 scenario forecast net interest income from the Dashboard U200 interest rate shock scenario. The exact shock rule is not formally defined and must not be assumed."@en ;
+    skos:broader almc:InterestRateRisk ;
+    skos:related almc:ALM.NII.BASE, almc:ALM.EVE.BASE ;
+    onto:domain "Interest Rate Risk" ;
+    onto:definitionStatus "needs_review" .
+
+almc:ALM.EVE.BASE a skos:Concept ;
+    skos:prefLabel "Base Economic Value of Equity"@en ;
+    skos:altLabel "Base EVE"@en, "Economic Value of Equity"@en ;
+    skos:definition "Base scenario Economic Value of Equity: the present value of assets minus liabilities under the base interest rate scenario."@en ;
+    skos:broader almc:InterestRateRisk ;
+    skos:related almc:ALM.NII.BASE, almc:ALM.NII.U200 ;
+    onto:domain "Interest Rate Risk" ;
+    onto:definitionStatus "confirmed" .
+
+almc:FIN.ROA a skos:Concept ;
+    skos:prefLabel "Return on Assets"@en ;
+    skos:altLabel "ROA"@en ;
+    skos:definition "Return on Assets. The measurement period and denominator basis (average vs period-end assets) are not yet confirmed."@en ;
+    skos:broader almc:Earnings ;
+    onto:domain "Earnings" ;
+    onto:definitionStatus "needs_review" .
+
+almc:CAP.TIER1 a skos:Concept ;
+    skos:prefLabel "Tier 1 Capital"@en ;
+    skos:altLabel "Tier 1"@en, "T1 Capital"@en ;
+    skos:definition "Tier 1 Capital amount. This is a capital amount and is DISTINCT from Tier 1 Capital Ratio."@en ;
+    skos:broader almc:Capital ;
+    onto:domain "Capital" ;
+    onto:definitionStatus "confirmed" .
