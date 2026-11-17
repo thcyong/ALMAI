@@ -20,7 +20,7 @@ if str(ROOT) not in sys.path:
 
 try:
     from dotenv import load_dotenv
-    load_dotenv(ROOT / "data_etl" / ".env")
+    load_dotenv(ROOT / ".env")
 except Exception:
     pass
 

@@ -23,7 +23,7 @@ TEST_BANK_ID = -48858
 TEST_AS_OF = date(2026, 6, 30)
 
 if __name__ == "__main__":
-    load_dotenv()
+    load_dotenv(Path(__file__).resolve().parents[1] / ".env")
     spec = load_dataset("configs/dashboard.yaml")
     source = create_source_engine()
     ai = create_ai_engine()

@@ -22,11 +22,10 @@ _ROOT = Path(__file__).resolve().parents[1]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-# Load the demo credentials (ARK_*) and the ETL connection string (AI_POSTGRES_URL).
+# Load the shared root .env (ARK_* credentials + AI_POSTGRES_URL).
 try:
     from dotenv import load_dotenv
-    load_dotenv(_ROOT / "chat" / ".env", override=False)
-    load_dotenv(_ROOT / "data_etl" / ".env", override=False)
+    load_dotenv(_ROOT / ".env", override=False)
 except Exception:
     pass
 

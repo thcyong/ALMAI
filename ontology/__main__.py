@@ -17,13 +17,12 @@ import os
 import sys
 from pathlib import Path
 
-# Read the data_etl .env so `--check-db` finds AI_POSTGRES_URL without manual
+# Read the shared root .env so `--check-db` finds AI_POSTGRES_URL without manual
 # export. This only loads a connection string; it does not import the data_etl
 # package, so the ontology stays decoupled.
 try:
     from dotenv import load_dotenv
-    load_dotenv(Path(__file__).resolve().parents[1] / "data_etl" / ".env",
-                override=False)
+    load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=False)
 except Exception:
     pass
 

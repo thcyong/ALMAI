@@ -94,7 +94,7 @@ PostgreSQL business DB  ── read-only query (WHERE bank_id / as_of_date / fil
 
 ```bash
 cd data_etl
-# Configure DEV_SQLSERVER_* and AI_POSTGRES_URL in .env
+# Configure DEV_SQLSERVER_* and AI_POSTGRES_URL in the root .env
 python debug_run.py        # Sync fixed test bank/date (TEST_BANK_ID=-48858, TEST_AS_OF=2026-06-30)
 ```
 
@@ -167,7 +167,7 @@ python -m unittest discover -s financial_query/tests -v
 - `chat/llm.py` wraps the Volcengine Ark (OpenAI-compatible) endpoint and uses **function calling** to translate natural language into `get_financial_metric(concept_id, bank_id, as_of_date)` parameters. The LLM only produces query parameters; the actual PostgreSQL read is always performed by `financial_query` (parameterized, read-only).
 - `chat/app.py` is a FastAPI backend (`GET /` serves the UI, `POST /api/chat` proxies to the LLM + query service).
 - `chat/static/index.html` is a minimal chat UI.
-- Credentials live in `chat/.env` (git-ignored); the LLM API key is never sent to the browser.
+- Credentials live in the shared root `.env` (git-ignored); the LLM API key is never sent to the browser.
 
 Run:
 

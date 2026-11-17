@@ -17,12 +17,12 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-# Load the data_etl .env so the PostgreSQL validation tests can find
+# Load the shared root .env so the PostgreSQL validation tests can find
 # AI_POSTGRES_URL. This only reads a connection string; it does not import the
 # data_etl package, so the ontology stays decoupled.
 try:
     from dotenv import load_dotenv
-    load_dotenv(ROOT / "data_etl" / ".env")
+    load_dotenv(ROOT / ".env")
 except Exception:
     pass
 

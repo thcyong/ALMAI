@@ -10,7 +10,7 @@ Only the **latest** data is kept: the 12 tables for the same `BankID + AsOfDate`
 - Microsoft ODBC Driver 17/18; PostgreSQL 14+.
 - Dependencies are declared in `pyproject.toml` (CLI script entry points removed).
 
-Configure `DEV_SQLSERVER_*` and `AI_POSTGRES_URL` in `.env`; `.env` is already ignored by `.gitignore`. `configs/dashboard.yaml` points to `configs/dashboard_field_mapping.csv`, which is the single field definition.
+Configure `DEV_SQLSERVER_*` and `AI_POSTGRES_URL` in the shared root `.env`; `.env` is already ignored by `.gitignore`. `configs/dashboard.yaml` points to `configs/dashboard_field_mapping.csv`, which is the single field definition.
 
 ## 2. Running
 
