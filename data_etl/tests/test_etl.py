@@ -30,7 +30,8 @@ from bank_etl.etl import sync_one
 from bank_etl.field_types import to_bool, to_int, to_text
 from bank_etl.models import (CATEGORIES, CATEGORY_BY_TABLE, SCHEMAS,
                              TARGET_TABLES, build_targets, load_categories)
-from bank_etl.postgres import init_database, read_business_scope
+from bank_etl.postgres import (init_database, plan_schema_changes,
+                               read_business_scope)
 from bank_etl.sqlserver import MultipleSourceRecordsError, build_query
 from bank_etl.transform import (as_of_parameter, coerce_date, to_decimal,
                                 transform_dataset)
@@ -528,6 +529,52 @@ class PostgresTests(unittest.TestCase):
         self.assertTrue(set(TARGET_TABLES).issubset(tables))
         self.assertFalse(any("version" in name or "history" in name
                              for name in tables))
+
+
+class SchemaPlanTests(unittest.TestCase):
+    """Schema detection/planner works without a live database."""
+
+    def _full_snapshot(self):
+        return {
+            "schemas": set(SCHEMAS),
+            "tables": set(TARGET_TABLES),
+            "columns": {name: set(target.allowed_columns) | {"updated_at"}
+                        for name, target in TARGET_TABLES.items()},
+        }
+
+    def test_no_changes_when_database_matches_registry(self):
+        plan = plan_schema_changes(self._full_snapshot())
+        self.assertEqual(plan["create_schemas"], [])
+        self.assertEqual(plan["create_tables"], [])
+        self.assertEqual(plan["add_columns"], [])
+        self.assertEqual(len(plan["replace_views"]), 1)
+
+    def test_new_schema_and_tables_are_planned(self):
+        snapshot = {"schemas": set(), "tables": set(), "columns": {}}
+        plan = plan_schema_changes(snapshot)
+        self.assertEqual(plan["create_schemas"], list(SCHEMAS))
+        self.assertEqual(plan["create_tables"], list(TARGET_TABLES))
+        self.assertEqual(plan["add_columns"], [])
+
+    def test_new_value_column_on_existing_table_is_planned(self):
+        snapshot = self._full_snapshot()
+        snapshot["columns"]["finance.earnings"].discard("roa")
+        plan = plan_schema_changes(snapshot)
+        self.assertEqual(plan["create_tables"], [])
+        self.assertEqual([(c["table"], c["column"]) for c in plan["add_columns"]],
+                         [("finance.earnings", "roa")])
+        self.assertEqual(plan["add_columns"][0]["type"], "NUMERIC")
+
+    def test_new_dimension_column_on_existing_table_is_rejected(self):
+        snapshot = self._full_snapshot()
+        snapshot["columns"]["risk.interest_rate_scenario"].discard("scenario_code")
+        with self.assertRaises(ValueError) as ctx:
+            plan_schema_changes(snapshot)
+        self.assertIn("key column 'scenario_code' is missing", str(ctx.exception))
+
+    def test_plan_carries_targets_for_apply(self):
+        plan = plan_schema_changes(self._full_snapshot())
+        self.assertIs(plan["targets"], TARGET_TABLES)
 
 
 class RegistryExtensionTests(unittest.TestCase):

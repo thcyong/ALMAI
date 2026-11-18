@@ -47,9 +47,14 @@ strategy) and `date_formats` (source as-of storage format, including `strftime`
 patterns and `range: true` for backfill), plus `views` such as
 `risk.bank_base_nii_eve`. At import time `models.py` derives `SCHEMAS`,
 `CATEGORY_BY_TABLE`, `TARGET_TABLES`, `STRATEGY_GRAIN`, `DATE_FORMATS` and the
-view list from the file; `postgres.py` creates missing tables, adds new value
-columns with `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, and honours each
-table's `owner_dataset`. `mapping.py` checks each field's
+view list from the file. `postgres.py:init_database` runs a detect → plan →
+apply flow: it reads a schema snapshot, plans the differences, creates missing
+schemas/tables, adds new value columns with `ALTER TABLE ... ADD COLUMN IF NOT
+EXISTS`, refreshes views and returns a report of what changed. Adding a key or
+dimension column to an existing table is rejected (it would change that
+table's grain) and needs a manual migration; nothing is dropped or altered in
+place. Each table's `owner_dataset` is honoured on write. `mapping.py` checks
+each field's
 `domain`/`subcategory` against the registry entry, so classification cannot
 drift silently. Supported column types live in `bank_etl/field_types.py`
 (`NUMERIC`, `BIGINT`, `INTEGER`, `DATE`, `TIMESTAMP`, `TEXT`, `BOOLEAN`), with

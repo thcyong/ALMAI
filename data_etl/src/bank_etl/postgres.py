@@ -5,7 +5,8 @@ import os
 from datetime import date
 from typing import Any, Mapping
 
-from sqlalchemy import Engine, create_engine, delete, insert, select, text
+from sqlalchemy import Engine, create_engine, delete, inspect, insert, select, text
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Session
 
 from bank_etl.config import DatasetSpec
@@ -25,26 +26,108 @@ def create_ai_engine() -> Engine:
     return create_engine(url, pool_pre_ping=True)
 
 
-def init_database(engine: Engine) -> None:
-    """Idempotently create registry schemas, tables, value columns and views.
+def read_schema_snapshot(engine: Engine) -> dict[str, Any]:
+    """Read the current database objects relevant to the registry."""
+    inspector = inspect(engine)
+    schemas = set(inspector.get_schema_names())
+    tables: set[str] = set()
+    columns: dict[str, set[str]] = {}
+    for schema in SCHEMAS:
+        for name in inspector.get_table_names(schema=schema):
+            qualified = f"{schema}.{name}"
+            tables.add(qualified)
+            columns[qualified] = {col["name"] for col in
+                                  inspector.get_columns(name, schema=schema)}
+    return {"schemas": schemas, "tables": tables, "columns": columns}
 
-    Both tables and value columns come from the classification registry, so a
-    new table/column takes effect without code changes. Existing objects are
-    only added to, never altered in place or dropped; the legacy
-    ``finance.metric_value`` table is left untouched.
+
+def plan_schema_changes(snapshot: Mapping[str, Any],
+                        targets: Mapping[str, Any] | None = None,
+                        views: tuple[tuple[str, str], ...] | None = None) -> dict[str, Any]:
+    """Diff the DB snapshot against the registry and return a concrete plan.
+
+    No DDL is executed. ``targets``/``views`` default to the registry-derived
+    globals, so tests can inject alternate registries. Adding a key/dimension
+    column to an *existing* table changes its grain and cannot be done safely;
+    it is reported as an error rather than applied. Value columns and views
+    are additive and always safe.
     """
-    with engine.begin() as conn:
-        for schema in SCHEMAS:
-            conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema}"))
-    business_metadata.create_all(engine)
-    with engine.begin() as conn:
-        for name, target in TARGET_TABLES.items():
+    active_targets = TARGET_TABLES if targets is None else targets
+    active_views = CATEGORY_VIEWS if views is None else views
+    existing_schemas = set(snapshot.get("schemas") or ())
+    existing_tables = set(snapshot.get("tables") or ())
+    existing_columns = snapshot.get("columns") or {}
+
+    plan: dict[str, Any] = {
+        "create_schemas": [s for s in SCHEMAS if s not in existing_schemas],
+        "create_tables": [name for name in active_targets if name not in existing_tables],
+        "targets": active_targets,
+        "add_columns": [],
+        "replace_views": [name for name, _ in active_views],
+        "errors": [],
+    }
+    for name, target in active_targets.items():
+        if name in existing_tables:
+            present = set(existing_columns.get(name, ()))
+            for column in target.key_columns:
+                if column not in present:
+                    plan["errors"].append(
+                        f"{name}: key column {column!r} is missing from the existing "
+                        "table; changing a table's grain requires a manual migration")
             for column in target.value_columns:
-                pg_type = target.column_types[column]
-                conn.execute(text(
-                    f"ALTER TABLE {name} ADD COLUMN IF NOT EXISTS {column} {pg_type}"))
-        for _, view_sql in CATEGORY_VIEWS:
+                if column not in present:
+                    column_type = target.table.c[column].type.compile(
+                        dialect=postgresql.dialect())
+                    plan["add_columns"].append(
+                        {"table": name, "column": column, "type": str(column_type)})
+    if plan["errors"]:
+        raise ValueError("Unsafe registry change detected: " + "; ".join(plan["errors"]))
+    return plan
+
+
+def apply_schema_plan(engine: Engine, plan: Mapping[str, Any],
+                      views: tuple[tuple[str, str], ...] | None = None) -> dict[str, Any]:
+    """Execute a plan produced by ``plan_schema_changes``; return a summary."""
+    active_views = CATEGORY_VIEWS if views is None else views
+    from sqlalchemy import Table as _Table
+
+    if plan["create_schemas"]:
+        with engine.begin() as conn:
+            for schema in plan["create_schemas"]:
+                conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema}"))
+    if plan["create_tables"]:
+        active_targets = plan.get("targets", TARGET_TABLES)
+        tables: list[_Table] = [active_targets[name].table
+                                for name in plan["create_tables"]]
+        business_metadata.create_all(engine, tables=tables)
+    with engine.begin() as conn:
+        for item in plan["add_columns"]:
+            conn.execute(text(
+                f"ALTER TABLE {item['table']} ADD COLUMN IF NOT EXISTS "
+                f"{item['column']} {item['type']}"))
+        for _, view_sql in active_views:
             conn.execute(text(view_sql))
+    return {
+        "created_schemas": list(plan["create_schemas"]),
+        "created_tables": list(plan["create_tables"]),
+        "added_columns": list(plan["add_columns"]),
+        "replaced_views": [name for name, _ in active_views],
+    }
+
+
+def init_database(engine: Engine) -> dict[str, Any]:
+    """Detect and apply registry additions: schemas, tables, columns, views.
+
+    The flow is explicit: read the current snapshot, plan the differences,
+    then apply only additive changes. New tables and value columns take effect
+    without code changes; key/dimension columns cannot be added to an existing
+    table (that would change its grain) and raise a clear error. Nothing is
+    dropped or altered in place, and the legacy ``finance.metric_value`` table
+    is left untouched.
+    """
+    snapshot = read_schema_snapshot(engine)
+    plan = plan_schema_changes(snapshot)
+    return apply_schema_plan(engine, plan)
 
 
 def _scope_key(spec: DatasetSpec, bank_id: int, as_of: date) -> str:
