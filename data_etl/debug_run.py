@@ -19,7 +19,8 @@ from bank_etl.postgres import create_ai_engine
 from bank_etl.sqlserver import create_source_engine
 
 # The single bank/date under test.
-TEST_BANK_ID = -48858
+# -48858,-48599
+TEST_BANK_ID = -48599
 TEST_AS_OF = date(2026, 6, 30)
 
 if __name__ == "__main__":
