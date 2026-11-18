@@ -9,7 +9,7 @@ from sqlalchemy import Engine, create_engine, delete, insert, select, text
 from sqlalchemy.orm import Session
 
 from bank_etl.config import DatasetSpec
-from bank_etl.models import (BANK_BASE_NII_EVE_VIEW, SCHEMAS, TARGET_TABLES,
+from bank_etl.models import (CATEGORY_VIEWS, SCHEMAS, TARGET_TABLES,
                              business_metadata)
 
 
@@ -26,17 +26,25 @@ def create_ai_engine() -> Engine:
 
 
 def init_database(engine: Engine) -> None:
-    """Idempotently create the four schemas, the 12 tables and the base view.
+    """Idempotently create registry schemas, tables, value columns and views.
 
-    Existing tables (including the legacy finance.metric_value) are never
-    altered or dropped here.
+    Both tables and value columns come from the classification registry, so a
+    new table/column takes effect without code changes. Existing objects are
+    only added to, never altered in place or dropped; the legacy
+    ``finance.metric_value`` table is left untouched.
     """
     with engine.begin() as conn:
         for schema in SCHEMAS:
             conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema}"))
     business_metadata.create_all(engine)
     with engine.begin() as conn:
-        conn.execute(text(BANK_BASE_NII_EVE_VIEW))
+        for name, target in TARGET_TABLES.items():
+            for column in target.value_columns:
+                pg_type = target.column_types[column]
+                conn.execute(text(
+                    f"ALTER TABLE {name} ADD COLUMN IF NOT EXISTS {column} {pg_type}"))
+        for _, view_sql in CATEGORY_VIEWS:
+            conn.execute(text(view_sql))
 
 
 def _scope_key(spec: DatasetSpec, bank_id: int, as_of: date) -> str:

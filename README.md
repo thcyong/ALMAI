@@ -43,7 +43,8 @@ PostgreSQL business DB  ── read-only query (WHERE bank_id / as_of_date / fil
 
 ### `data_etl/` — Bank Financial ETL (`banking-dashboard-etl`)
 
-- Read-only Dev SQL Server (`ApplicationIntent=ReadOnly`) → mapped via `configs/dashboard.yaml` + `configs/dashboard_field_mapping.csv` (331 fields) → Decimal cleansing → written to PostgreSQL.
+- Read-only Dev SQL Server (`ApplicationIntent=ReadOnly`) → mapped via `configs/dashboard.yaml` + `configs/dashboard_field_mapping.yaml` (331 fields in grouped YAML) → Decimal cleansing → written to PostgreSQL.
+- `configs/categories.yaml` is the classification registry (schema → domain → table → value columns, plus grains, date formats, dataset owner and views). Schemas, target tables, writer columns/grains/formats and views are all derived from it; adding a table/column/grain/format needs no Python change.
 - Lands **12 business tables** across `core / finance / risk / analysis` schemas; the same `BankID + AsOfDate` is replaced entirely within a single transaction (only the latest is kept, no history).
 - Design highlights: idempotent table creation, single-transaction rollback, `owner_dataset` isolation, no financial recomputation (NULL/0/negative kept as-is), 235 fields marked "to be verified".
 - See [`data_etl/README.md`](data_etl/README.md) for detailed design, run instructions and tests.
@@ -70,7 +71,7 @@ PostgreSQL business DB  ── read-only query (WHERE bank_id / as_of_date / fil
 ## 3. Design Principles
 
 1. **Decoupling**: ETL, Ontology, and Financial Query Service are three independent packages; the query service obtains mappings only through the `ontology` public API, does not directly couple to ETL, and does not duplicate a second copy of the mapping inside `financial_query`.
-2. **Data-driven**: adding a financial field only updates `dashboard_field_mapping.csv`; adding a concept only updates `banking.ttl` + `mappings.yaml`; the main flow code stays stable.
+2. **Data-driven**: adding a financial field only updates `dashboard_field_mapping.yaml`; adding a concept only updates `banking.ttl` + `mappings.yaml`; the main flow code stays stable.
 3. **Read-only and idempotent**: ETL reads the source read-only, creates tables idempotently, replaces in a single transaction; Ontology reads database metadata, Financial Query Service reads business data — none of the three ever writes business data.
 4. **Stable identifiers**: each financial concept has a fixed Concept ID and URI (`https://almai.example/ontology/concept/<ID>`) that does not change when underlying table/column names change.
 5. **Safe queries**: semantic mapping only declares `table` / `column` / `filters` and explicitly forbids SQL expressions; the query service builds **parameterized read-only SQL** with SQLAlchemy Core accordingly, never concatenating user input.

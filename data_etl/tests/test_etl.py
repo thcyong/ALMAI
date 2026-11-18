@@ -1,4 +1,4 @@
-"""Tests for the config-driven, 331-field Dashboard sync.
+"""Tests for the config-driven, registry-based Dashboard sync.
 
     python -m unittest discover -s tests -v
 
@@ -10,20 +10,26 @@ from __future__ import annotations
 import os
 import sys
 import unittest
+from collections import Counter
+from dataclasses import replace
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 from unittest import mock
 from uuid import uuid4
 
+import yaml
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from sqlalchemy import create_engine, delete, inspect, text
+from sqlalchemy import MetaData, create_engine, delete, inspect, text
 
 from bank_etl.config import load_dataset
 from bank_etl.etl import sync_one
-from bank_etl.models import SCHEMAS, TARGET_TABLES
+from bank_etl.field_types import to_bool, to_int, to_text
+from bank_etl.models import (CATEGORIES, CATEGORY_BY_TABLE, SCHEMAS,
+                             TARGET_TABLES, build_targets, load_categories)
 from bank_etl.postgres import init_database, read_business_scope
 from bank_etl.sqlserver import MultipleSourceRecordsError, build_query
 from bank_etl.transform import (as_of_parameter, coerce_date, to_decimal,
@@ -31,7 +37,8 @@ from bank_etl.transform import (as_of_parameter, coerce_date, to_decimal,
 
 BANK = -48858
 ASOF = date(2026, 6, 30)
-MAPPING_CSV = ROOT / "configs" / "dashboard_field_mapping.csv"
+MAPPING_YAML = ROOT / "configs" / "dashboard_field_mapping.yaml"
+CATEGORIES_YAML = ROOT / "configs" / "categories.yaml"
 
 YAML_TEMPLATE = """dataset: dashboard
 mapping_file: MAPPING_FILE
@@ -107,44 +114,79 @@ def full_record(spec, overrides=None, bank_id=BANK, as_of=ASOF):
 class _ConfigPair:
     def __enter__(self):
         name = uuid4().hex[:8]
-        self.csv = ROOT / "configs" / f"_test_{name}.csv"
-        self.yaml = ROOT / "configs" / f"_test_{name}.yaml"
-        self.csv.write_text(MAPPING_CSV.read_text(encoding="utf-8"),
-                            encoding="utf-8")
+        self.mapping = ROOT / "configs" / f"_test_{name}_mapping.yaml"
+        self.yaml = ROOT / "configs" / f"_test_{name}_dataset.yaml"
+        self.mapping.write_text(MAPPING_YAML.read_text(encoding="utf-8"),
+                                encoding="utf-8")
         return self
 
-    def load(self, yaml_text=None, csv_text=None):
-        if csv_text is not None:
-            self.csv.write_text(csv_text, encoding="utf-8")
-        text_value = (yaml_text or YAML_TEMPLATE).replace("MAPPING_FILE", self.csv.name)
+    def load(self, yaml_text=None, mapping_text=None, *, categories=None, targets=None,
+             strategy_grain=None):
+        if mapping_text is not None:
+            self.mapping.write_text(mapping_text, encoding="utf-8")
+        text_value = (yaml_text or YAML_TEMPLATE).replace("MAPPING_FILE", self.mapping.name)
         self.yaml.write_text(text_value, encoding="utf-8")
-        return load_dataset(self.yaml)
+        return load_dataset(self.yaml, categories=categories, targets=targets,
+                            strategy_grain=strategy_grain)
 
     def __exit__(self, *exc):
-        self.csv.unlink(missing_ok=True)
+        self.mapping.unlink(missing_ok=True)
         self.yaml.unlink(missing_ok=True)
         return False
 
 
-def _csv_rows(text):
+def _mapping_lines(text):
     return text.splitlines()
 
 
+def _flat_rows(path):
+    """Expand a grouped mapping YAML into flat rows for count assertions."""
+    with path.open(encoding="utf-8") as stream:
+        obj = yaml.safe_load(stream)
+    rows = []
+    for group in obj["groups"]:
+        inherited = {key: group[key] for key in
+                     ("domain", "subcategory", "target_table", "mapping",
+                      "dimension", "source_alias", "pg_type", "confidence")
+                     if key in group}
+        for field in group["fields"]:
+            row = dict(inherited)
+            row.update(field)
+            rows.append(row)
+    return rows
+
+
+def field_count():
+    return len(_flat_rows(MAPPING_YAML))
+
+
+def mapping_counts(column):
+    return Counter(str(row.get(column) or "").strip() for row in _flat_rows(MAPPING_YAML))
+
+
+def expected_rows(spec):
+    return sum(
+        1 if target.grain == "single_row"
+        else len(spec.mapping.dimensions(name))
+        for name, target in TARGET_TABLES.items())
+
+
 class ConfigTests(unittest.TestCase):
-    def test_all_331_fields_are_mapped(self):
+    def test_all_mapping_fields_are_loaded(self):
         spec = dashboard()
-        self.assertEqual(len(spec.mapping.rules), 331)
-        self.assertEqual(len(spec.bindings), 331)
+        self.assertEqual(len(spec.mapping.rules), field_count())
+        self.assertEqual(len(spec.bindings), field_count())
+        strategies = mapping_counts("mapping")
         self.assertEqual(spec.mapping.strategy_counts,
-                         {"direct": 76, "scenario_unpivot": 180,
-                          "sector_unpivot": 75})
+                         {name: strategies[name] for name in spec.mapping.strategy_counts})
 
     def test_dimensions_and_targets(self):
         spec = dashboard()
-        self.assertEqual(len(spec.mapping.target_tables), 12)
+        self.assertEqual(set(spec.mapping.target_tables), set(TARGET_TABLES))
         self.assertEqual(len(spec.mapping.dimensions("risk.interest_rate_scenario")), 12)
         self.assertEqual(len(spec.mapping.dimensions("finance.balance_sheet_sector")), 15)
-        self.assertEqual(len(spec.mapping.unconfirmed_fields), 235)
+        self.assertEqual(len(spec.mapping.unconfirmed_fields),
+                         mapping_counts("confidence")["to_be_verified"])
 
     def test_every_target_cell_is_allowlisted(self):
         spec = dashboard()
@@ -163,7 +205,7 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(spec.mapping.by_dev_field["ID"].source_alias, "d")
 
     def test_mapping_file_must_stay_in_configs(self):
-        for value in ("../data/dashboard_field_mapping.csv", str(MAPPING_CSV)):
+        for value in ("../data/dashboard_field_mapping.yaml", str(MAPPING_YAML)):
             with _ConfigPair() as pair:
                 with self.assertRaises(ValueError):
                     pair.load(YAML_TEMPLATE.replace("MAPPING_FILE", value))
@@ -175,50 +217,89 @@ class ConfigTests(unittest.TestCase):
 
     def test_duplicate_source_field_is_rejected(self):
         with _ConfigPair() as pair:
-            rows = _csv_rows(MAPPING_CSV.read_text(encoding="utf-8"))
-            rows[2] = rows[1]
+            lines = _mapping_lines(MAPPING_YAML.read_text(encoding="utf-8"))
+            anchor = next(line for line in lines if "dev_field: Margin," in line)
+            lines.insert(lines.index(anchor) + 1, anchor)
             with self.assertRaises(ValueError):
-                pair.load(csv_text="\n".join(rows) + "\n")
+                pair.load(mapping_text="\n".join(lines) + "\n")
 
     def test_unknown_target_table_is_rejected(self):
         with _ConfigPair() as pair:
-            rows = MAPPING_CSV.read_text(encoding="utf-8")
-            rows = rows.replace("core.bank_snapshot,dashboard_source_id",
-                                "raw.unknown_table,dashboard_source_id", 1)
+            text = MAPPING_YAML.read_text(encoding="utf-8").replace(
+                "target_table: core.bank_snapshot", "target_table: raw.unknown_table", 1)
             with self.assertRaises(ValueError):
-                pair.load(csv_text=rows)
+                pair.load(mapping_text=text)
 
     def test_wrong_pg_type_is_rejected(self):
         with _ConfigPair() as pair:
-            rows = MAPPING_CSV.read_text(encoding="utf-8")
-            rows = rows.replace("core.bank_snapshot.dashboard_source_id,BIGINT",
-                                "core.bank_snapshot.dashboard_source_id,NUMERIC", 1)
+            text = MAPPING_YAML.read_text(encoding="utf-8").replace(
+                "target_column: dashboard_source_id, pg_type: BIGINT",
+                "target_column: dashboard_source_id, pg_type: NUMERIC", 1)
             with self.assertRaises(ValueError):
-                pair.load(csv_text=rows)
+                pair.load(mapping_text=text)
 
     def test_incomplete_dimension_matrix_is_rejected(self):
         with _ConfigPair() as pair:
-            rows = [line for line in _csv_rows(MAPPING_CSV.read_text(encoding="utf-8"))
-                    if "NIIs_D100," not in line]
+            lines = [line for line in _mapping_lines(
+                MAPPING_YAML.read_text(encoding="utf-8"))
+                if "dev_field: NIIs_D100," not in line]
             with self.assertRaises(ValueError):
-                pair.load(csv_text="\n".join(rows) + "\n")
+                pair.load(mapping_text="\n".join(lines) + "\n")
 
     def test_new_mapping_field_needs_no_code_change(self):
         with _ConfigPair() as pair:
-            rows = MAPPING_CSV.read_text(encoding="utf-8").replace(
-                ",Margin,", ",Margin_New,", 1)
-            spec = pair.load(csv_text=rows)
+            text = MAPPING_YAML.read_text(encoding="utf-8").replace(
+                "dev_field: Margin,", "dev_field: Margin_New,", 1)
+            spec = pair.load(mapping_text=text)
             self.assertIn("Margin_New", spec.mapping.by_dev_field)
             record = full_record(spec, {"Margin_New": "0.125"})
             grouped = transform_dataset(record, spec.mapping, BANK, ASOF)
             self.assertEqual(grouped["finance.earnings"][0]["margin"], Decimal("0.125"))
+
+    def test_domain_label_must_match_registry(self):
+        with _ConfigPair() as pair:
+            text = MAPPING_YAML.read_text(encoding="utf-8").replace(
+                '  - domain: "Profitability"\n    subcategory: "Profitability Indicators"\n'
+                '    target_table: finance.earnings',
+                '  - domain: "Wrong Domain"\n    subcategory: "Profitability Indicators"\n'
+                '    target_table: finance.earnings', 1)
+            with self.assertRaises(ValueError):
+                pair.load(mapping_text=text)
+
+    def test_registry_column_expansion_needs_no_code_change(self):
+        with _ConfigPair() as pair:
+            category = CATEGORY_BY_TABLE["finance.earnings"]
+            expanded = replace(
+                category, values={**category.values, "extra_margin": "NUMERIC"})
+            categories = tuple(
+                expanded if item.table == category.table else item
+                for item in CATEGORIES)
+            registry = {item.table: item for item in categories}
+            targets = build_targets(categories, MetaData())
+
+            lines = _mapping_lines(MAPPING_YAML.read_text(encoding="utf-8"))
+            anchor = next(line for line in lines
+                          if "dev_field: Margin," in line)
+            extra = anchor.replace("dev_field: Margin,", "dev_field: Margin_Extra,", 1)
+            extra = extra.replace("target_column: margin,",
+                                  "target_column: extra_margin,", 1)
+            lines.insert(lines.index(anchor) + 1, extra)
+
+            spec = pair.load(mapping_text="\n".join(lines) + "\n",
+                             categories=registry, targets=targets)
+            rule = spec.mapping.by_dev_field["Margin_Extra"]
+            self.assertEqual(rule.target_column, "extra_margin")
+            record = full_record(spec, {"Margin_Extra": "0.25"})
+            grouped = transform_dataset(record, spec.mapping, BANK, ASOF)
+            self.assertEqual(grouped["finance.earnings"][0]["extra_margin"],
+                             Decimal("0.25"))
 
 
 class SqlTests(unittest.TestCase):
     def test_all_mapped_columns_are_selected(self):
         spec = dashboard()
         sql, _ = build_query(spec, BANK, ASOF)
-        self.assertEqual(sql.count(" AS [f_"), 331)
+        self.assertEqual(sql.count(" AS [f_"), len(spec.bindings))
         self.assertIn("[d].[ID] AS [f_0]", sql)
         self.assertIn("[w].[BankID]", sql)
         self.assertIn("[w].[asof]", sql)
@@ -238,22 +319,22 @@ class SqlTests(unittest.TestCase):
 
 
 class TransformTests(unittest.TestCase):
-    def test_37_rows_across_12_tables(self):
-        grouped = transform_dataset(full_record(dashboard()),
-                                    dashboard().mapping, BANK, ASOF)
-        self.assertEqual(len(grouped), 12)
-        self.assertEqual(sum(len(rows) for rows in grouped.values()), 37)
+    def test_rows_across_all_registry_tables(self):
+        spec = dashboard()
+        grouped = transform_dataset(full_record(spec), spec.mapping, BANK, ASOF)
+        self.assertEqual(len(grouped), len(TARGET_TABLES))
+        self.assertEqual(sum(len(rows) for rows in grouped.values()),
+                         expected_rows(spec))
         self.assertEqual(len(grouped["risk.interest_rate_scenario"]), 12)
         self.assertEqual(len(grouped["finance.balance_sheet_sector"]), 15)
 
     def test_all_null_scenarios_are_kept(self):
-        grouped = transform_dataset(full_record(dashboard()),
-                                    dashboard().mapping, BANK, ASOF)
+        spec = dashboard()
+        grouped = transform_dataset(full_record(spec), spec.mapping, BANK, ASOF)
         codes = {row["scenario_code"]
                  for row in grouped["risk.interest_rate_scenario"]}
-        self.assertEqual(codes, {"Base", "D100", "D200", "D300", "D400",
-                                 "U100", "U200", "U300", "U400",
-                                 "BearFlattener", "BullFlattener", "Steepening"})
+        self.assertEqual(codes,
+                         set(spec.mapping.dimensions("risk.interest_rate_scenario")))
 
     def test_decimal_null_zero_and_negative(self):
         self.assertIsNone(to_decimal(None, "x"))
@@ -352,13 +433,14 @@ class PostgresTests(unittest.TestCase):
             return sum(conn.execute(text(f"SELECT count(*) FROM {name}")).scalar()
                        for name in TARGET_TABLES)
 
-    def test_first_sync_writes_all_12_tables(self):
+    def test_first_sync_writes_all_registry_tables(self):
         result = self.sync(full_record(self.spec, {
             "NIIs_Base": 1391523.6369047775, "EVEs_Base": 16382384.200495906}))
+        rows = expected_rows(self.spec)
         self.assertEqual(result["status"], "success")
-        self.assertEqual(len(result["tables"]), 12)
-        self.assertEqual(sum(result["tables"].values()), 37)
-        self.assertEqual(self.row_count(), 37)
+        self.assertEqual(len(result["tables"]), len(TARGET_TABLES))
+        self.assertEqual(sum(result["tables"].values()), rows)
+        self.assertEqual(self.row_count(), rows)
         self.assertEqual(result["base_nii_eve"]["nii"], "1391523.6369047775")
 
     def test_resync_replaces_without_accumulation(self):
@@ -368,7 +450,7 @@ class PostgresTests(unittest.TestCase):
         scenarios = {row["scenario_code"]: row
                      for row in scope["risk.interest_rate_scenario"]}
         self.assertEqual(scenarios["Base"]["nii"], Decimal("2"))
-        self.assertEqual(self.row_count(), 37)
+        self.assertEqual(self.row_count(), expected_rows(self.spec))
 
     def test_failure_rolls_back_the_whole_scope(self):
         self.sync(full_record(self.spec, {"NIIs_Base": 11}))
@@ -427,9 +509,10 @@ class PostgresTests(unittest.TestCase):
 
     def test_removed_dimension_leaves_no_stale_row(self):
         with _ConfigPair() as pair:
-            rows = [line for line in _csv_rows(MAPPING_CSV.read_text(encoding="utf-8"))
-                    if "LoanSector_" not in line]
-            spec = pair.load(csv_text="\n".join(rows) + "\n")
+            lines = [line for line in _mapping_lines(
+                MAPPING_YAML.read_text(encoding="utf-8"))
+                if "dev_field: LoanSector_" not in line]
+            spec = pair.load(mapping_text="\n".join(lines) + "\n")
             self.sync(full_record(self.spec), spec=self.spec)
             self.sync(full_record(spec), spec=spec)
             scope = read_business_scope(self.engine, spec, BANK, ASOF)
@@ -440,11 +523,76 @@ class PostgresTests(unittest.TestCase):
     def test_no_history_or_version_tables(self):
         inspector = inspect(self.engine)
         tables = {f"{schema}.{name}"
-                  for schema in ("core", "finance", "risk", "analysis")
+                  for schema in SCHEMAS
                   for name in inspector.get_table_names(schema=schema)}
         self.assertTrue(set(TARGET_TABLES).issubset(tables))
         self.assertFalse(any("version" in name or "history" in name
                              for name in tables))
+
+
+class RegistryExtensionTests(unittest.TestCase):
+    """New types, grains, date formats and dataset owners need no code change."""
+
+    def _registry(self, delimiter):
+        text = CATEGORIES_YAML.read_text(encoding="utf-8")
+        return text.replace(delimiter[0], delimiter[1], 1)
+
+    def test_new_value_types_are_config_driven(self):
+        registry = self._registry((
+            '      adj_nii24: NUMERIC\n',
+            '      adj_nii24: NUMERIC\n      extra_note: TEXT\n'
+            '      extra_flag: BOOLEAN\n      extra_count: INTEGER\n'))
+        cat = load_categories(self._write_registry(registry))
+        targets = build_targets(cat.categories, MetaData())
+        from bank_etl.field_types import CONVERTERS
+        self.assertEqual(targets["risk.interest_rate_scenario"]
+                         .column_types["extra_note"], "TEXT")
+        self.assertIs(CONVERTERS["TEXT"], to_text)
+        self.assertIs(CONVERTERS["BOOLEAN"], to_bool)
+        self.assertIs(CONVERTERS["INTEGER"], to_int)
+
+    def test_new_grain_is_config_driven(self):
+        registry = self._registry((
+            '  - name: sector_rows\n    strategy: sector_unpivot\n',
+            '  - name: sector_rows\n    strategy: sector_unpivot\n'
+            '  - name: product_rows\n    strategy: product_unpivot\n'))
+        registry = registry.replace('grain: sector_rows', 'grain: product_rows', 1)
+        cat = load_categories(self._write_registry(registry))
+        self.assertEqual(cat.strategy_grain["product_unpivot"], "product_rows")
+        with _ConfigPair() as pair:
+            text = MAPPING_YAML.read_text(encoding="utf-8").replace(
+                'mapping: sector_unpivot', 'mapping: product_unpivot', 1)
+            spec = pair.load(mapping_text=text,
+                             targets=build_targets(cat.categories, MetaData()),
+                             categories={c.table: c for c in cat.categories},
+                             strategy_grain=cat.strategy_grain)
+            self.assertIn("product_unpivot", spec.mapping.strategy_counts)
+
+    def test_custom_date_format_is_config_driven(self):
+        registry = self._registry((
+            '  datetime: {kind: datetime, range: true}\n',
+            '  datetime: {kind: datetime, range: true}\n'
+            '  compact_iso: {kind: strftime, format: "%Y%m%d", cast: str, range: false}\n'))
+        cat = load_categories(self._write_registry(registry))
+        self.assertIn("compact_iso", cat.date_formats)
+        value = cat.date_formats["compact_iso"][0](ASOF)
+        self.assertEqual(value, "20260630")
+        from bank_etl.transform import as_of_parameter
+        self.assertEqual(as_of_parameter(ASOF, "compact_iso", cat.date_formats),
+                         "20260630")
+
+    def test_owner_dataset_is_config_driven(self):
+        registry = self._registry((
+            'owner_dataset: dashboard\n', 'owner_dataset: risk_team\n'))
+        cat = load_categories(self._write_registry(registry))
+        targets = build_targets(cat.categories, MetaData())
+        self.assertEqual(targets["finance.earnings"].owner_dataset, "risk_team")
+
+    def _write_registry(self, text):
+        path = ROOT / "configs" / f"_test_registry_{uuid4().hex[:8]}.yaml"
+        path.write_text(text, encoding="utf-8")
+        self.addCleanup(path.unlink, missing_ok=True)
+        return path
 
 
 if __name__ == "__main__":

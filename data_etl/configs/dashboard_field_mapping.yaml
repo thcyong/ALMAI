@@ -1,0 +1,430 @@
+# Source-to-target field mapping for the Dashboard dataset.
+# Group attributes are inherited by every field in the group.
+source_dataset: dashboard
+
+groups:
+  - domain: "Banking Context"
+    subcategory: "Base Information"
+    target_table: core.bank_snapshot
+    mapping: direct
+    dimension: "bank/date"
+    fields:
+      - {dev_field: ID, source_alias: d, target_column: dashboard_source_id, pg_type: BIGINT, confidence: high, notes: "Dev Dashboard raw row ID, not bank_id"}
+      - {dev_field: BankID, source_alias: w, target_column: bank_id, pg_type: BIGINT, confidence: high, notes: "Original bank ID; stored directly"}
+      - {dev_field: asof, source_alias: w, target_column: as_of_date, pg_type: DATE, confidence: high, notes: "YYYYMMDD integer converted to PostgreSQL DATE"}
+  - domain: "Credit & Asset Quality"
+    subcategory: "Loss Provision"
+    target_table: risk.asset_quality
+    mapping: direct
+    dimension: "bank/date"
+    source_alias: d
+    pg_type: NUMERIC
+    fields:
+      - {dev_field: CECL, target_column: cecl, confidence: to_be_verified, notes: "CECL and ALLL must not be merged directly"}
+      - {dev_field: LossRate, target_column: loss_rate, confidence: to_be_verified, notes: "Loss rate denominator and measurement period to be confirmed"}
+      - {dev_field: ALLL, target_column: alll, confidence: to_be_verified, notes: "ALLL and CECL must not be merged directly"}
+  - domain: "Profitability"
+    subcategory: "Profitability Indicators"
+    target_table: finance.earnings
+    mapping: direct
+    dimension: "bank/date"
+    source_alias: d
+    pg_type: NUMERIC
+    fields:
+      - {dev_field: Margin, target_column: margin, confidence: to_be_verified, notes: "Margin definition, measurement period and unit need confirmation"}
+      - {dev_field: ROA, target_column: roa, confidence: high}
+      - {dev_field: ROE, target_column: roe, confidence: high}
+      - {dev_field: NonIntCost, target_column: non_int_cost, confidence: high}
+      - {dev_field: EffMgnTax, target_column: eff_mgn_tax, confidence: to_be_verified, notes: "Tax rate / margin caliber and unit to be confirmed"}
+      - {dev_field: NonII, target_column: non_ii, confidence: to_be_verified, notes: "NonII name/caliber needs Dev confirmation"}
+      - {dev_field: NonIC, target_column: non_ic, confidence: to_be_verified, notes: "NonIC name/caliber needs Dev confirmation"}
+      - {dev_field: ROAEx, target_column: roa_ex, confidence: high}
+      - {dev_field: ROEEx, target_column: roe_ex, confidence: high}
+  - domain: "Liquidity Risk"
+    subcategory: "Liquidity Indicators"
+    target_table: risk.liquidity
+    mapping: direct
+    dimension: "bank/date"
+    source_alias: d
+    pg_type: NUMERIC
+    fields:
+      - {dev_field: ST2Asset, target_column: st2asset, confidence: high}
+      - {dev_field: STI2Asset, target_column: sti2asset, confidence: to_be_verified, notes: "Abbreviation STI caliber to be confirmed"}
+      - {dev_field: NLL2Asset, target_column: nll2asset, confidence: to_be_verified, notes: "Abbreviation NLL caliber to be confirmed"}
+      - {dev_field: LCR, target_column: lcr, confidence: high}
+  - domain: "Funding Source"
+    subcategory: "Funding Structure"
+    target_table: finance.funding
+    mapping: direct
+    dimension: "bank/date"
+    source_alias: d
+    pg_type: NUMERIC
+    fields:
+      - {dev_field: Loan2Deposit, target_column: loan2deposit, confidence: high}
+      - {dev_field: NLL2Deposit, target_column: nll2deposit, confidence: to_be_verified, notes: "Abbreviation NLL caliber to be confirmed"}
+      - {dev_field: NLL2CoreDeposit, target_column: nll2coredeposit, confidence: to_be_verified, notes: "Abbreviation NLL caliber to be confirmed"}
+      - {dev_field: NetNonCoreFundingDependence, target_column: net_noncore_funding_dependence, confidence: high}
+      - {dev_field: FundingCost, target_column: funding_cost, confidence: high}
+  - domain: "Interest Rate Risk"
+    subcategory: "Interest Rate Risk Rollup"
+    target_table: risk.interest_rate_risk
+    mapping: direct
+    dimension: "bank/date"
+    source_alias: d
+    pg_type: NUMERIC
+    fields:
+      - {dev_field: GapRatio, target_column: gap_ratio, confidence: to_be_verified, notes: "GapRatio and GapRatios_Base are not necessarily equal; do not merge"}
+      - {dev_field: YieldCurveRisk, target_column: yield_curve_risk, confidence: high}
+      - {dev_field: OptionRisk, target_column: option_risk, confidence: high}
+      - {dev_field: BasisRisk, target_column: basis_risk, confidence: high}
+      - {dev_field: StressEVE, target_column: stress_eve, confidence: high}
+      - {dev_field: StressDynamicGap, target_column: stress_dynamic_gap, confidence: high}
+      - {dev_field: StressNII12, target_column: stress_nii12, confidence: high}
+      - {dev_field: StressEfficiencyRatio, target_column: stress_efficiency_ratio, confidence: high}
+      - {dev_field: KRD_KRD3M, target_column: krd_3m, confidence: high}
+      - {dev_field: KRD_KRD1Y, target_column: krd_1y, confidence: high}
+      - {dev_field: KRD_KRD3Y, target_column: krd_3y, confidence: high}
+      - {dev_field: KRD_KRD5Y, target_column: krd_5y, confidence: high}
+      - {dev_field: KRD_KRD7Y, target_column: krd_7y, confidence: high}
+      - {dev_field: KRD_KRD10Y, target_column: krd_10y, confidence: high}
+      - {dev_field: KRD_KRD20Y, target_column: krd_20y, confidence: high}
+      - {dev_field: KRD_KRD30Y, target_column: krd_30y, confidence: high}
+      - {dev_field: NCUA_BaseEVERatio, target_column: ncua_base_eve_ratio, confidence: high}
+      - {dev_field: NCUA_U300EVERatio, target_column: ncua_u300_eve_ratio, confidence: high}
+      - {dev_field: NCUA_Duration, target_column: ncua_duration, confidence: high}
+      - {dev_field: GapAssetNonsens, target_column: gap_asset_nonsens, confidence: to_be_verified, notes: "Field name contains Nonsens; needs explicit Dev definition; tentatively classified under interest-rate-risk model indicators"}
+  - domain: "Capital"
+    subcategory: "Capital & Leverage"
+    target_table: finance.capital
+    mapping: direct
+    dimension: "bank/date"
+    source_alias: d
+    pg_type: NUMERIC
+    fields:
+      - {dev_field: Tier1, target_column: tier1, confidence: high}
+      - {dev_field: Tier1Ratio, target_column: tier1_ratio, confidence: high}
+      - {dev_field: Tier1RiskBasedRatio, target_column: tier1_risk_based_ratio, confidence: high}
+      - {dev_field: TotalRiskBasedRatio, target_column: total_risk_based_ratio, confidence: high}
+      - {dev_field: Leverage, target_column: leverage, confidence: high}
+      - {dev_field: LeverageAsset, target_column: leverage_asset, confidence: to_be_verified, notes: "Whether LeverageAsset is a denominator or base asset to be confirmed"}
+  - domain: "Balance Sheet Structure"
+    subcategory: "Sector Detail Rollup"
+    target_table: finance.balance_sheet_sector
+    mapping: sector_unpivot
+    dimension: "sector_code"
+    source_alias: d
+    pg_type: NUMERIC
+    fields:
+      - {dev_field: LoanSector_Value, target_column: sector_value, code: Loan, confidence: high, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: LoanSector_Duration, target_column: sector_duration, code: Loan, confidence: to_be_verified, notes: "Duration unit and algorithm need Dev confirmation"}
+      - {dev_field: LoanSector_GapRatio, target_column: sector_gap_ratio, code: Loan, confidence: to_be_verified, notes: "GapRatio calculation caliber to be confirmed"}
+      - {dev_field: LoanSector_Rate, target_column: sector_rate, code: Loan, confidence: to_be_verified, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: InvestmentSector_Value, target_column: sector_value, code: Investment, confidence: high, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: InvestmentSector_Duration, target_column: sector_duration, code: Investment, confidence: to_be_verified, notes: "Duration unit and algorithm need Dev confirmation"}
+      - {dev_field: InvestmentSector_GapRatio, target_column: sector_gap_ratio, code: Investment, confidence: to_be_verified, notes: "GapRatio calculation caliber to be confirmed"}
+      - {dev_field: InvestmentSector_Rate, target_column: sector_rate, code: Investment, confidence: to_be_verified, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: DepositSector_Value, target_column: sector_value, code: Deposit, confidence: high, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: DepositSector_Duration, target_column: sector_duration, code: Deposit, confidence: to_be_verified, notes: "Duration unit and algorithm need Dev confirmation"}
+      - {dev_field: DepositSector_GapRatio, target_column: sector_gap_ratio, code: Deposit, confidence: to_be_verified, notes: "GapRatio calculation caliber to be confirmed"}
+      - {dev_field: DepositSector_Rate, target_column: sector_rate, code: Deposit, confidence: to_be_verified, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: STSector_Value, target_column: sector_value, code: ST, confidence: high, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: STSector_Duration, target_column: sector_duration, code: ST, confidence: to_be_verified, notes: "Duration unit and algorithm need Dev confirmation"}
+      - {dev_field: STSector_GapRatio, target_column: sector_gap_ratio, code: ST, confidence: to_be_verified, notes: "GapRatio calculation caliber to be confirmed"}
+      - {dev_field: STSector_Rate, target_column: sector_rate, code: ST, confidence: to_be_verified, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: AssetSector_Value, target_column: sector_value, code: Asset, confidence: high, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: AssetSector_Duration, target_column: sector_duration, code: Asset, confidence: to_be_verified, notes: "Duration unit and algorithm need Dev confirmation"}
+      - {dev_field: AssetSector_GapRatio, target_column: sector_gap_ratio, code: Asset, confidence: to_be_verified, notes: "GapRatio calculation caliber to be confirmed"}
+      - {dev_field: AssetSector_Rate, target_column: sector_rate, code: Asset, confidence: to_be_verified, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: TimeDepositSector_Value, target_column: sector_value, code: TimeDeposit, confidence: high, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: TimeDepositSector_Duration, target_column: sector_duration, code: TimeDeposit, confidence: to_be_verified, notes: "Duration unit and algorithm need Dev confirmation"}
+      - {dev_field: TimeDepositSector_GapRatio, target_column: sector_gap_ratio, code: TimeDeposit, confidence: to_be_verified, notes: "GapRatio calculation caliber to be confirmed"}
+      - {dev_field: TimeDepositSector_Rate, target_column: sector_rate, code: TimeDeposit, confidence: to_be_verified, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: NMDSector_Value, target_column: sector_value, code: NMD, confidence: high, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: NMDSector_Duration, target_column: sector_duration, code: NMD, confidence: to_be_verified, notes: "Duration unit and algorithm need Dev confirmation"}
+      - {dev_field: NMDSector_GapRatio, target_column: sector_gap_ratio, code: NMD, confidence: to_be_verified, notes: "GapRatio calculation caliber to be confirmed"}
+      - {dev_field: NMDSector_Rate, target_column: sector_rate, code: NMD, confidence: to_be_verified, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: BorrowingSector_Value, target_column: sector_value, code: Borrowing, confidence: high, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: BorrowingSector_Duration, target_column: sector_duration, code: Borrowing, confidence: to_be_verified, notes: "Duration unit and algorithm need Dev confirmation"}
+      - {dev_field: BorrowingSector_GapRatio, target_column: sector_gap_ratio, code: Borrowing, confidence: to_be_verified, notes: "GapRatio calculation caliber to be confirmed"}
+      - {dev_field: BorrowingSector_Rate, target_column: sector_rate, code: Borrowing, confidence: to_be_verified, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: LiabilitySector_Value, target_column: sector_value, code: Liability, confidence: high, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: LiabilitySector_Duration, target_column: sector_duration, code: Liability, confidence: to_be_verified, notes: "Duration unit and algorithm need Dev confirmation"}
+      - {dev_field: LiabilitySector_GapRatio, target_column: sector_gap_ratio, code: Liability, confidence: to_be_verified, notes: "GapRatio calculation caliber to be confirmed"}
+      - {dev_field: LiabilitySector_Rate, target_column: sector_rate, code: Liability, confidence: to_be_verified, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: MMDASector_Value, target_column: sector_value, code: MMDA, confidence: high, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: MMDASector_Duration, target_column: sector_duration, code: MMDA, confidence: to_be_verified, notes: "Duration unit and algorithm need Dev confirmation"}
+      - {dev_field: MMDASector_GapRatio, target_column: sector_gap_ratio, code: MMDA, confidence: to_be_verified, notes: "GapRatio calculation caliber to be confirmed"}
+      - {dev_field: MMDASector_Rate, target_column: sector_rate, code: MMDA, confidence: to_be_verified, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: SavingSector_Value, target_column: sector_value, code: Saving, confidence: high, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: SavingSector_Duration, target_column: sector_duration, code: Saving, confidence: to_be_verified, notes: "Duration unit and algorithm need Dev confirmation"}
+      - {dev_field: SavingSector_GapRatio, target_column: sector_gap_ratio, code: Saving, confidence: to_be_verified, notes: "GapRatio calculation caliber to be confirmed"}
+      - {dev_field: SavingSector_Rate, target_column: sector_rate, code: Saving, confidence: to_be_verified, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: TransactionSector_Value, target_column: sector_value, code: Transaction, confidence: high, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: TransactionSector_Duration, target_column: sector_duration, code: Transaction, confidence: to_be_verified, notes: "Duration unit and algorithm need Dev confirmation"}
+      - {dev_field: TransactionSector_GapRatio, target_column: sector_gap_ratio, code: Transaction, confidence: to_be_verified, notes: "GapRatio calculation caliber to be confirmed"}
+      - {dev_field: TransactionSector_Rate, target_column: sector_rate, code: Transaction, confidence: to_be_verified, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: NonInterestSector_Value, target_column: sector_value, code: NonInterest, confidence: high, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: NonInterestSector_Duration, target_column: sector_duration, code: NonInterest, confidence: to_be_verified, notes: "Duration unit and algorithm need Dev confirmation"}
+      - {dev_field: NonInterestSector_GapRatio, target_column: sector_gap_ratio, code: NonInterest, confidence: to_be_verified, notes: "GapRatio calculation caliber to be confirmed"}
+      - {dev_field: NonInterestSector_Rate, target_column: sector_rate, code: NonInterest, confidence: to_be_verified, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: EquitySector_Value, target_column: sector_value, code: Equity, confidence: high, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: EquitySector_Duration, target_column: sector_duration, code: Equity, confidence: to_be_verified, notes: "Duration unit and algorithm need Dev confirmation"}
+      - {dev_field: EquitySector_GapRatio, target_column: sector_gap_ratio, code: Equity, confidence: to_be_verified, notes: "GapRatio calculation caliber to be confirmed"}
+      - {dev_field: EquitySector_Rate, target_column: sector_rate, code: Equity, confidence: to_be_verified, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: OBSSector_Value, target_column: sector_value, code: OBS, confidence: high, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: OBSSector_Duration, target_column: sector_duration, code: OBS, confidence: to_be_verified, notes: "Duration unit and algorithm need Dev confirmation"}
+      - {dev_field: OBSSector_GapRatio, target_column: sector_gap_ratio, code: OBS, confidence: to_be_verified, notes: "GapRatio calculation caliber to be confirmed"}
+      - {dev_field: OBSSector_Rate, target_column: sector_rate, code: OBS, confidence: to_be_verified, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: EquitySector_Face, target_column: sector_face, code: Equity, confidence: high, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: STSector_Face, target_column: sector_face, code: ST, confidence: high, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: LoanSector_Face, target_column: sector_face, code: Loan, confidence: high, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: InvestmentSector_Face, target_column: sector_face, code: Investment, confidence: high, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: AssetSector_Face, target_column: sector_face, code: Asset, confidence: high, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: DepositSector_Face, target_column: sector_face, code: Deposit, confidence: high, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: TimeDepositSector_Face, target_column: sector_face, code: TimeDeposit, confidence: high, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: NMDSector_Face, target_column: sector_face, code: NMD, confidence: high, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: BorrowingSector_Face, target_column: sector_face, code: Borrowing, confidence: high, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: LiabilitySector_Face, target_column: sector_face, code: Liability, confidence: high, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: MMDASector_Face, target_column: sector_face, code: MMDA, confidence: high, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: SavingSector_Face, target_column: sector_face, code: Saving, confidence: high, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: TransactionSector_Face, target_column: sector_face, code: Transaction, confidence: high, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: NonInterestSector_Face, target_column: sector_face, code: NonInterest, confidence: high, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+      - {dev_field: OBSSector_Face, target_column: sector_face, code: OBS, confidence: high, notes: "Sector classification; Value/Face/Rate measurement caliber to be confirmed; Rate is not auto-divided by 100"}
+  - domain: "Interest Rate Risk"
+    subcategory: "Interest Rate Scenario Results"
+    target_table: risk.interest_rate_scenario
+    mapping: scenario_unpivot
+    dimension: "scenario_code"
+    source_alias: d
+    pg_type: NUMERIC
+    fields:
+      - {dev_field: ROEs_D100, target_column: roe, code: D100, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: ROEs_Base, target_column: roe, code: Base, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: ROEs_U100, target_column: roe, code: U100, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: ROEs_U200, target_column: roe, code: U200, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: ROEs_U300, target_column: roe, code: U300, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: ROEs_U400, target_column: roe, code: U400, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: GapRatios_D100, target_column: gap_ratio, code: D100, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: GapRatios_Base, target_column: gap_ratio, code: Base, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: GapRatios_U100, target_column: gap_ratio, code: U100, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: GapRatios_U200, target_column: gap_ratio, code: U200, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: GapRatios_U300, target_column: gap_ratio, code: U300, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: GapRatios_U400, target_column: gap_ratio, code: U400, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: ROEs_D300, target_column: roe, code: D300, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: ROEs_D200, target_column: roe, code: D200, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: ROEs_BullFlattener, target_column: roe, code: BullFlattener, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. This sample value is NULL and does not represent zero."}
+      - {dev_field: ROEs_BearFlattener, target_column: roe, code: BearFlattener, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. This sample value is NULL and does not represent zero."}
+      - {dev_field: ROEs_Steepening, target_column: roe, code: Steepening, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. This sample value is NULL and does not represent zero."}
+      - {dev_field: GapRatios_D300, target_column: gap_ratio, code: D300, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: GapRatios_D200, target_column: gap_ratio, code: D200, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: GapRatios_BullFlattener, target_column: gap_ratio, code: BullFlattener, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. This sample value is NULL and does not represent zero."}
+      - {dev_field: GapRatios_BearFlattener, target_column: gap_ratio, code: BearFlattener, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. This sample value is NULL and does not represent zero."}
+      - {dev_field: GapRatios_Steepening, target_column: gap_ratio, code: Steepening, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. This sample value is NULL and does not represent zero."}
+      - {dev_field: RepricingGapRatios_D300, target_column: repricing_gap_ratio, code: D300, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: RepricingGapRatios_D200, target_column: repricing_gap_ratio, code: D200, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: RepricingGapRatios_D100, target_column: repricing_gap_ratio, code: D100, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: RepricingGapRatios_Base, target_column: repricing_gap_ratio, code: Base, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: RepricingGapRatios_U100, target_column: repricing_gap_ratio, code: U100, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: RepricingGapRatios_U200, target_column: repricing_gap_ratio, code: U200, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: RepricingGapRatios_U300, target_column: repricing_gap_ratio, code: U300, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: RepricingGapRatios_U400, target_column: repricing_gap_ratio, code: U400, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: RepricingGapRatios_BullFlattener, target_column: repricing_gap_ratio, code: BullFlattener, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. This sample value is NULL and does not represent zero."}
+      - {dev_field: RepricingGapRatios_BearFlattener, target_column: repricing_gap_ratio, code: BearFlattener, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. This sample value is NULL and does not represent zero."}
+      - {dev_field: RepricingGapRatios_Steepening, target_column: repricing_gap_ratio, code: Steepening, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. This sample value is NULL and does not represent zero."}
+      - {dev_field: DynamicGaps_D300, target_column: dynamic_gap, code: D300, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: DynamicGaps_D200, target_column: dynamic_gap, code: D200, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: DynamicGaps_D100, target_column: dynamic_gap, code: D100, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: DynamicGaps_Base, target_column: dynamic_gap, code: Base, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: DynamicGaps_U100, target_column: dynamic_gap, code: U100, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: DynamicGaps_U200, target_column: dynamic_gap, code: U200, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: DynamicGaps_U300, target_column: dynamic_gap, code: U300, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: DynamicGaps_U400, target_column: dynamic_gap, code: U400, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: DynamicGaps_BullFlattener, target_column: dynamic_gap, code: BullFlattener, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. This sample value is NULL and does not represent zero."}
+      - {dev_field: DynamicGaps_BearFlattener, target_column: dynamic_gap, code: BearFlattener, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. This sample value is NULL and does not represent zero."}
+      - {dev_field: DynamicGaps_Steepening, target_column: dynamic_gap, code: Steepening, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. This sample value is NULL and does not represent zero."}
+      - {dev_field: EVEs_D300, target_column: eve, code: D300, confidence: high, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: EVEs_D200, target_column: eve, code: D200, confidence: high, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: EVEs_D100, target_column: eve, code: D100, confidence: high, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: EVEs_Base, target_column: eve, code: Base, confidence: high, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: EVEs_U100, target_column: eve, code: U100, confidence: high, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: EVEs_U200, target_column: eve, code: U200, confidence: high, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: EVEs_U300, target_column: eve, code: U300, confidence: high, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: EVEs_U400, target_column: eve, code: U400, confidence: high, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: EVEs_BullFlattener, target_column: eve, code: BullFlattener, confidence: high, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. This sample value is NULL and does not represent zero."}
+      - {dev_field: EVEs_BearFlattener, target_column: eve, code: BearFlattener, confidence: high, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. This sample value is NULL and does not represent zero."}
+      - {dev_field: EVEs_Steepening, target_column: eve, code: Steepening, confidence: high, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. This sample value is NULL and does not represent zero."}
+      - {dev_field: Investments_D300, target_column: investments, code: D300, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: Investments_D200, target_column: investments, code: D200, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: Investments_D100, target_column: investments, code: D100, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: Investments_Base, target_column: investments, code: Base, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: Investments_U100, target_column: investments, code: U100, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: Investments_U200, target_column: investments, code: U200, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: Investments_U300, target_column: investments, code: U300, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: Investments_U400, target_column: investments, code: U400, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: Investments_BullFlattener, target_column: investments, code: BullFlattener, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. This sample value is NULL and does not represent zero."}
+      - {dev_field: Investments_BearFlattener, target_column: investments, code: BearFlattener, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. This sample value is NULL and does not represent zero."}
+      - {dev_field: Investments_Steepening, target_column: investments, code: Steepening, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. This sample value is NULL and does not represent zero."}
+      - {dev_field: NIIs_D300, target_column: nii, code: D300, confidence: high, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: NIIs_D200, target_column: nii, code: D200, confidence: high, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: NIIs_D100, target_column: nii, code: D100, confidence: high, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: NIIs_Base, target_column: nii, code: Base, confidence: high, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: NIIs_U100, target_column: nii, code: U100, confidence: high, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: NIIs_U200, target_column: nii, code: U200, confidence: high, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: NIIs_U300, target_column: nii, code: U300, confidence: high, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: NIIs_U400, target_column: nii, code: U400, confidence: high, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: NIIs_BullFlattener, target_column: nii, code: BullFlattener, confidence: high, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. This sample value is NULL and does not represent zero."}
+      - {dev_field: NIIs_BearFlattener, target_column: nii, code: BearFlattener, confidence: high, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. This sample value is NULL and does not represent zero."}
+      - {dev_field: NIIs_Steepening, target_column: nii, code: Steepening, confidence: high, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. This sample value is NULL and does not represent zero."}
+      - {dev_field: NII24s_D300, target_column: nii24, code: D300, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor."}
+      - {dev_field: NII24s_D200, target_column: nii24, code: D200, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor."}
+      - {dev_field: NII24s_D100, target_column: nii24, code: D100, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor."}
+      - {dev_field: NII24s_Base, target_column: nii24, code: Base, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor."}
+      - {dev_field: NII24s_U100, target_column: nii24, code: U100, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor."}
+      - {dev_field: NII24s_U200, target_column: nii24, code: U200, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor."}
+      - {dev_field: NII24s_U300, target_column: nii24, code: U300, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor."}
+      - {dev_field: NII24s_U400, target_column: nii24, code: U400, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor."}
+      - {dev_field: NII24s_BullFlattener, target_column: nii24, code: BullFlattener, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor. This sample value is NULL and does not represent zero."}
+      - {dev_field: NII24s_BearFlattener, target_column: nii24, code: BearFlattener, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor. This sample value is NULL and does not represent zero."}
+      - {dev_field: NII24s_Steepening, target_column: nii24, code: Steepening, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor. This sample value is NULL and does not represent zero."}
+      - {dev_field: NIs_D300, target_column: ni, code: D300, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: NIs_D200, target_column: ni, code: D200, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: NIs_D100, target_column: ni, code: D100, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: NIs_Base, target_column: ni, code: Base, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: NIs_U100, target_column: ni, code: U100, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: NIs_U200, target_column: ni, code: U200, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: NIs_U300, target_column: ni, code: U300, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: NIs_U400, target_column: ni, code: U400, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: NIs_BullFlattener, target_column: ni, code: BullFlattener, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. This sample value is NULL and does not represent zero."}
+      - {dev_field: NIs_BearFlattener, target_column: ni, code: BearFlattener, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. This sample value is NULL and does not represent zero."}
+      - {dev_field: NIs_Steepening, target_column: ni, code: Steepening, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. This sample value is NULL and does not represent zero."}
+      - {dev_field: NI24s_D300, target_column: ni24, code: D300, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor."}
+      - {dev_field: NI24s_D200, target_column: ni24, code: D200, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor."}
+      - {dev_field: NI24s_D100, target_column: ni24, code: D100, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor."}
+      - {dev_field: NI24s_Base, target_column: ni24, code: Base, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor."}
+      - {dev_field: NI24s_U100, target_column: ni24, code: U100, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor."}
+      - {dev_field: NI24s_U200, target_column: ni24, code: U200, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor."}
+      - {dev_field: NI24s_U300, target_column: ni24, code: U300, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor."}
+      - {dev_field: NI24s_U400, target_column: ni24, code: U400, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor."}
+      - {dev_field: NI24s_BullFlattener, target_column: ni24, code: BullFlattener, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor. This sample value is NULL and does not represent zero."}
+      - {dev_field: NI24s_BearFlattener, target_column: ni24, code: BearFlattener, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor. This sample value is NULL and does not represent zero."}
+      - {dev_field: NI24s_Steepening, target_column: ni24, code: Steepening, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor. This sample value is NULL and does not represent zero."}
+      - {dev_field: ROEsEx_D300, target_column: roe_ex, code: D300, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. Adj/Ex calculation definition to be confirmed."}
+      - {dev_field: ROEsEx_D200, target_column: roe_ex, code: D200, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. Adj/Ex calculation definition to be confirmed."}
+      - {dev_field: ROEsEx_D100, target_column: roe_ex, code: D100, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. Adj/Ex calculation definition to be confirmed."}
+      - {dev_field: ROEsEx_Base, target_column: roe_ex, code: Base, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. Adj/Ex calculation definition to be confirmed."}
+      - {dev_field: ROEsEx_U100, target_column: roe_ex, code: U100, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. Adj/Ex calculation definition to be confirmed."}
+      - {dev_field: ROEsEx_U200, target_column: roe_ex, code: U200, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. Adj/Ex calculation definition to be confirmed."}
+      - {dev_field: ROEsEx_U300, target_column: roe_ex, code: U300, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. Adj/Ex calculation definition to be confirmed."}
+      - {dev_field: ROEsEx_U400, target_column: roe_ex, code: U400, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. Adj/Ex calculation definition to be confirmed."}
+      - {dev_field: ROEsEx_BullFlattener, target_column: roe_ex, code: BullFlattener, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. Adj/Ex calculation definition to be confirmed. This sample value is NULL and does not represent zero."}
+      - {dev_field: ROEsEx_BearFlattener, target_column: roe_ex, code: BearFlattener, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. Adj/Ex calculation definition to be confirmed. This sample value is NULL and does not represent zero."}
+      - {dev_field: ROEsEx_Steepening, target_column: roe_ex, code: Steepening, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. Adj/Ex calculation definition to be confirmed. This sample value is NULL and does not represent zero."}
+      - {dev_field: GapRSALRatios_D300, target_column: gap_rsal_ratio, code: D300, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. RSAL abbreviation to be confirmed."}
+      - {dev_field: GapRSALRatios_D200, target_column: gap_rsal_ratio, code: D200, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. RSAL abbreviation to be confirmed."}
+      - {dev_field: GapRSALRatios_D100, target_column: gap_rsal_ratio, code: D100, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. RSAL abbreviation to be confirmed."}
+      - {dev_field: GapRSALRatios_Base, target_column: gap_rsal_ratio, code: Base, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. RSAL abbreviation to be confirmed."}
+      - {dev_field: GapRSALRatios_U100, target_column: gap_rsal_ratio, code: U100, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. RSAL abbreviation to be confirmed."}
+      - {dev_field: GapRSALRatios_U200, target_column: gap_rsal_ratio, code: U200, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. RSAL abbreviation to be confirmed."}
+      - {dev_field: GapRSALRatios_U300, target_column: gap_rsal_ratio, code: U300, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. RSAL abbreviation to be confirmed."}
+      - {dev_field: GapRSALRatios_U400, target_column: gap_rsal_ratio, code: U400, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. RSAL abbreviation to be confirmed."}
+      - {dev_field: GapRSALRatios_BullFlattener, target_column: gap_rsal_ratio, code: BullFlattener, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. RSAL abbreviation to be confirmed. This sample value is NULL and does not represent zero."}
+      - {dev_field: GapRSALRatios_BearFlattener, target_column: gap_rsal_ratio, code: BearFlattener, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. RSAL abbreviation to be confirmed. This sample value is NULL and does not represent zero."}
+      - {dev_field: GapRSALRatios_Steepening, target_column: gap_rsal_ratio, code: Steepening, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. RSAL abbreviation to be confirmed. This sample value is NULL and does not represent zero."}
+      - {dev_field: RepricingGapRSALRatios_D300, target_column: repricing_gap_rsal_ratio, code: D300, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. RSAL abbreviation to be confirmed."}
+      - {dev_field: RepricingGapRSALRatios_D200, target_column: repricing_gap_rsal_ratio, code: D200, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. RSAL abbreviation to be confirmed."}
+      - {dev_field: RepricingGapRSALRatios_D100, target_column: repricing_gap_rsal_ratio, code: D100, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. RSAL abbreviation to be confirmed."}
+      - {dev_field: RepricingGapRSALRatios_Base, target_column: repricing_gap_rsal_ratio, code: Base, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. RSAL abbreviation to be confirmed."}
+      - {dev_field: RepricingGapRSALRatios_U100, target_column: repricing_gap_rsal_ratio, code: U100, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. RSAL abbreviation to be confirmed."}
+      - {dev_field: RepricingGapRSALRatios_U200, target_column: repricing_gap_rsal_ratio, code: U200, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. RSAL abbreviation to be confirmed."}
+      - {dev_field: RepricingGapRSALRatios_U300, target_column: repricing_gap_rsal_ratio, code: U300, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. RSAL abbreviation to be confirmed."}
+      - {dev_field: RepricingGapRSALRatios_U400, target_column: repricing_gap_rsal_ratio, code: U400, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. RSAL abbreviation to be confirmed."}
+      - {dev_field: RepricingGapRSALRatios_BullFlattener, target_column: repricing_gap_rsal_ratio, code: BullFlattener, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. RSAL abbreviation to be confirmed. This sample value is NULL and does not represent zero."}
+      - {dev_field: RepricingGapRSALRatios_BearFlattener, target_column: repricing_gap_rsal_ratio, code: BearFlattener, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. RSAL abbreviation to be confirmed. This sample value is NULL and does not represent zero."}
+      - {dev_field: RepricingGapRSALRatios_Steepening, target_column: repricing_gap_rsal_ratio, code: Steepening, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. RSAL abbreviation to be confirmed. This sample value is NULL and does not represent zero."}
+      - {dev_field: EVEs_D400, target_column: eve, code: D400, confidence: high, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: Investments_D400, target_column: investments, code: D400, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: NIIs_D400, target_column: nii, code: D400, confidence: high, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: NII24s_D400, target_column: nii24, code: D400, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor."}
+      - {dev_field: NIs_D400, target_column: ni, code: D400, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: NI24s_D400, target_column: ni24, code: D400, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor."}
+      - {dev_field: ROEs_D400, target_column: roe, code: D400, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: ROEsEx_D400, target_column: roe_ex, code: D400, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. Adj/Ex calculation definition to be confirmed."}
+      - {dev_field: GapRatios_D400, target_column: gap_ratio, code: D400, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: GapRSALRatios_D400, target_column: gap_rsal_ratio, code: D400, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. RSAL abbreviation to be confirmed."}
+      - {dev_field: RepricingGapRatios_D400, target_column: repricing_gap_ratio, code: D400, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: RepricingGapRSALRatios_D400, target_column: repricing_gap_rsal_ratio, code: D400, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. RSAL abbreviation to be confirmed."}
+      - {dev_field: DynamicGaps_D400, target_column: dynamic_gap, code: D400, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation."}
+      - {dev_field: AdjNIIs_D400, target_column: adj_nii, code: D400, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. Adj/Ex calculation definition to be confirmed."}
+      - {dev_field: AdjNIIs_D300, target_column: adj_nii, code: D300, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. Adj/Ex calculation definition to be confirmed."}
+      - {dev_field: AdjNIIs_D200, target_column: adj_nii, code: D200, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. Adj/Ex calculation definition to be confirmed."}
+      - {dev_field: AdjNIIs_D100, target_column: adj_nii, code: D100, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. Adj/Ex calculation definition to be confirmed."}
+      - {dev_field: AdjNIIs_Base, target_column: adj_nii, code: Base, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. Adj/Ex calculation definition to be confirmed."}
+      - {dev_field: AdjNIIs_U100, target_column: adj_nii, code: U100, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. Adj/Ex calculation definition to be confirmed."}
+      - {dev_field: AdjNIIs_U200, target_column: adj_nii, code: U200, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. Adj/Ex calculation definition to be confirmed."}
+      - {dev_field: AdjNIIs_U300, target_column: adj_nii, code: U300, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. Adj/Ex calculation definition to be confirmed."}
+      - {dev_field: AdjNIIs_U400, target_column: adj_nii, code: U400, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. Adj/Ex calculation definition to be confirmed."}
+      - {dev_field: AdjNIIs_BullFlattener, target_column: adj_nii, code: BullFlattener, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. Adj/Ex calculation definition to be confirmed. This sample value is NULL and does not represent zero."}
+      - {dev_field: AdjNIIs_BearFlattener, target_column: adj_nii, code: BearFlattener, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. Adj/Ex calculation definition to be confirmed. This sample value is NULL and does not represent zero."}
+      - {dev_field: AdjNIIs_Steepening, target_column: adj_nii, code: Steepening, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. Adj/Ex calculation definition to be confirmed. This sample value is NULL and does not represent zero."}
+      - {dev_field: AdjNII24s_D400, target_column: adj_nii24, code: D400, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor. Adj/Ex calculation definition to be confirmed."}
+      - {dev_field: AdjNII24s_D300, target_column: adj_nii24, code: D300, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor. Adj/Ex calculation definition to be confirmed."}
+      - {dev_field: AdjNII24s_D200, target_column: adj_nii24, code: D200, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor. Adj/Ex calculation definition to be confirmed."}
+      - {dev_field: AdjNII24s_D100, target_column: adj_nii24, code: D100, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor. Adj/Ex calculation definition to be confirmed."}
+      - {dev_field: AdjNII24s_Base, target_column: adj_nii24, code: Base, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor. Adj/Ex calculation definition to be confirmed."}
+      - {dev_field: AdjNII24s_U100, target_column: adj_nii24, code: U100, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor. Adj/Ex calculation definition to be confirmed."}
+      - {dev_field: AdjNII24s_U200, target_column: adj_nii24, code: U200, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor. Adj/Ex calculation definition to be confirmed."}
+      - {dev_field: AdjNII24s_U300, target_column: adj_nii24, code: U300, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor. Adj/Ex calculation definition to be confirmed."}
+      - {dev_field: AdjNII24s_U400, target_column: adj_nii24, code: U400, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor. Adj/Ex calculation definition to be confirmed."}
+      - {dev_field: AdjNII24s_BullFlattener, target_column: adj_nii24, code: BullFlattener, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor. Adj/Ex calculation definition to be confirmed. This sample value is NULL and does not represent zero."}
+      - {dev_field: AdjNII24s_BearFlattener, target_column: adj_nii24, code: BearFlattener, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor. Adj/Ex calculation definition to be confirmed. This sample value is NULL and does not represent zero."}
+      - {dev_field: AdjNII24s_Steepening, target_column: adj_nii24, code: Steepening, confidence: to_be_verified, notes: "Scenario code retained only as an identifier; rate-shock basis points, tenor and model caliber need Dev confirmation. 24s is not automatically interpreted as a concrete forecast tenor. Adj/Ex calculation definition to be confirmed. This sample value is NULL and does not represent zero."}
+  - domain: "Model Risk & Loss"
+    subcategory: "Loss Distribution & Model Parameters"
+    target_table: risk.loss_distribution
+    mapping: direct
+    dimension: "bank/date"
+    source_alias: d
+    pg_type: NUMERIC
+    fields:
+      - {dev_field: PaRBeta_Min, target_column: par_beta_min, confidence: to_be_verified, notes: "PaR abbreviation and model distribution definition to be confirmed"}
+      - {dev_field: PaRBeta_Max, target_column: par_beta_max, confidence: to_be_verified, notes: "PaR abbreviation and model distribution definition to be confirmed"}
+      - {dev_field: PaRBeta_A, target_column: par_beta_a, confidence: to_be_verified, notes: "PaR model parameter definition to be confirmed"}
+      - {dev_field: PaRBeta_B, target_column: par_beta_b, confidence: to_be_verified, notes: "PaR model parameter definition to be confirmed"}
+      - {dev_field: P95Loss, target_column: p95_loss, confidence: to_be_verified, notes: "P95Loss statistical caliber to be confirmed"}
+      - {dev_field: P85Loss, target_column: p85_loss, confidence: to_be_verified, notes: "P85Loss statistical caliber to be confirmed"}
+      - {dev_field: Loss5Distance, target_column: loss5_distance, confidence: to_be_verified, notes: "Distance definition to be confirmed"}
+      - {dev_field: Loss15Distance, target_column: loss15_distance, confidence: to_be_verified, notes: "Distance definition to be confirmed"}
+  - domain: "Profitability"
+    subcategory: "Income Attribution"
+    target_table: finance.income_attribution
+    mapping: direct
+    dimension: "bank/date"
+    source_alias: d
+    pg_type: NUMERIC
+    fields:
+      - {dev_field: IA_OptionSpread, target_column: ia_option_spread, confidence: high}
+      - {dev_field: IA_CapIncome, target_column: ia_cap_income, confidence: high}
+      - {dev_field: IA_OptionIncome, target_column: ia_option_income, confidence: high}
+      - {dev_field: IA_OASIncome, target_column: ia_oas_income, confidence: high}
+      - {dev_field: IA_UnGain, target_column: ia_un_gain, confidence: high}
+      - {dev_field: IA_NII, target_column: ia_nii, confidence: high}
+  - domain: "Bank Rating"
+    subcategory: "CAMELS Model Score"
+    target_table: analysis.camels
+    mapping: direct
+    dimension: "bank/date"
+    source_alias: d
+    pg_type: NUMERIC
+    fields:
+      - {dev_field: Score_C, target_column: score_c, confidence: to_be_verified, notes: "Model score caliber to be confirmed; Score and CFSScore must not be auto-mixed"}
+      - {dev_field: Score_A, target_column: score_a, confidence: to_be_verified, notes: "Model score caliber to be confirmed; Score and CFSScore must not be auto-mixed"}
+      - {dev_field: Score_M, target_column: score_m, confidence: to_be_verified, notes: "Model score caliber to be confirmed; Score and CFSScore must not be auto-mixed"}
+      - {dev_field: Score_E, target_column: score_e, confidence: to_be_verified, notes: "Model score caliber to be confirmed; Score and CFSScore must not be auto-mixed"}
+      - {dev_field: Score_L, target_column: score_l, confidence: to_be_verified, notes: "Model score caliber to be confirmed; Score and CFSScore must not be auto-mixed"}
+      - {dev_field: Score_S, target_column: score_s, confidence: to_be_verified, notes: "Model score caliber to be confirmed; Score and CFSScore must not be auto-mixed"}
+      - {dev_field: CFSScore_C, target_column: cfs_score_c, confidence: to_be_verified, notes: "Model score caliber to be confirmed; Score and CFSScore must not be auto-mixed"}
+      - {dev_field: CFSScore_A, target_column: cfs_score_a, confidence: to_be_verified, notes: "Model score caliber to be confirmed; Score and CFSScore must not be auto-mixed"}
+      - {dev_field: CFSScore_M, target_column: cfs_score_m, confidence: to_be_verified, notes: "Model score caliber to be confirmed; Score and CFSScore must not be auto-mixed"}
+      - {dev_field: CFSScore_E, target_column: cfs_score_e, confidence: to_be_verified, notes: "Model score caliber to be confirmed; Score and CFSScore must not be auto-mixed"}
+      - {dev_field: CFSScore_L, target_column: cfs_score_l, confidence: to_be_verified, notes: "Model score caliber to be confirmed; Score and CFSScore must not be auto-mixed"}
+      - {dev_field: CFSScore_S, target_column: cfs_score_s, confidence: to_be_verified, notes: "Model score caliber to be confirmed; Score and CFSScore must not be auto-mixed"}

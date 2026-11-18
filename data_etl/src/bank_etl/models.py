@@ -1,86 +1,30 @@
-"""PostgreSQL business tables and the target-table allow-list.
+"""PostgreSQL business tables, derived from the classification registry.
 
-The 12 tables and their columns are declared here, in code, so field mappings
-and writers can only address pre-declared targets. The legacy
-``finance.metric_value`` table is deliberately not managed here: it stays in the
-database until the separate drop migration is run.
+``configs/categories.yaml`` is the single source of truth: schemas, allowed
+target tables, their columns, writer grains, date formats and views are all
+built from it at import time. Adding a table, column, grain, date format or
+dataset owner there is enough; removing objects is intentionally not automated.
+The legacy ``finance.metric_value`` table is deliberately not managed here.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Callable
 
-from sqlalchemy import (BigInteger, Column, Date, DateTime, MetaData, Numeric,
-                        Table, Text, func)
+import yaml
+from sqlalchemy import MetaData, Table
 
-SCHEMAS = ("core", "finance", "risk", "analysis")
+from bank_etl.field_types import SQL_TYPES, build_date_format
+
+CONFIGS_ROOT = Path(__file__).resolve().parents[2] / "configs"
+CATEGORIES_PATH = CONFIGS_ROOT / "categories.yaml"
 
 business_metadata = MetaData()
 
-_TYPES = {"NUMERIC": Numeric, "BIGINT": BigInteger, "DATE": Date, "TEXT": Text}
-
-
-def _numeric(*names: str) -> dict[str, str]:
-    return {name: "NUMERIC" for name in names}
-
-
-# qualified name -> (writer grain, dimension column, value columns)
-_TABLE_DEFS: dict[str, tuple[str, str | None, dict[str, str]]] = {
-    "core.bank_snapshot": (
-        "single_row", None, {"dashboard_source_id": "BIGINT"}),
-    "finance.earnings": (
-        "single_row", None,
-        _numeric("margin", "roa", "roe", "non_ii", "non_ic", "non_int_cost",
-                 "eff_mgn_tax", "roa_ex", "roe_ex")),
-    "finance.funding": (
-        "single_row", None,
-        _numeric("loan2deposit", "nll2deposit", "nll2coredeposit",
-                 "net_noncore_funding_dependence", "funding_cost")),
-    "finance.capital": (
-        "single_row", None,
-        _numeric("tier1", "tier1_ratio", "tier1_risk_based_ratio",
-                 "total_risk_based_ratio", "leverage", "leverage_asset")),
-    "risk.liquidity": (
-        "single_row", None,
-        _numeric("st2asset", "sti2asset", "nll2asset", "lcr")),
-    "risk.asset_quality": (
-        "single_row", None, _numeric("cecl", "loss_rate", "alll")),
-    "finance.balance_sheet_sector": (
-        "sector_rows", "sector_code",
-        _numeric("sector_value", "sector_face", "sector_duration",
-                 "sector_gap_ratio", "sector_rate")),
-    "risk.interest_rate_risk": (
-        "single_row", None,
-        _numeric("gap_ratio", "yield_curve_risk", "option_risk", "basis_risk",
-                 "stress_eve", "stress_dynamic_gap", "stress_nii12",
-                 "stress_efficiency_ratio", "ncua_base_eve_ratio",
-                 "ncua_u300_eve_ratio", "ncua_duration", "krd_3m", "krd_1y",
-                 "krd_3y", "krd_5y", "krd_7y", "krd_10y", "krd_20y",
-                 "krd_30y", "gap_asset_nonsens")),
-    "risk.interest_rate_scenario": (
-        "scenario_rows", "scenario_code",
-        _numeric("roe", "gap_ratio", "repricing_gap_ratio", "dynamic_gap",
-                 "eve", "investments", "nii", "nii24", "ni", "ni24", "roe_ex",
-                 "gap_rsal_ratio", "repricing_gap_rsal_ratio", "adj_nii",
-                 "adj_nii24")),
-    "finance.income_attribution": (
-        "single_row", None,
-        _numeric("ia_option_spread", "ia_cap_income", "ia_option_income",
-                 "ia_oas_income", "ia_un_gain", "ia_nii")),
-    "risk.loss_distribution": (
-        "single_row", None,
-        _numeric("par_beta_min", "par_beta_max", "par_beta_a", "par_beta_b",
-                 "p95_loss", "p85_loss", "loss5_distance", "loss15_distance")),
-    "analysis.camels": (
-        "single_row", None,
-        _numeric("score_c", "score_a", "score_m", "score_e", "score_l",
-                 "score_s", "cfs_score_c", "cfs_score_a", "cfs_score_m",
-                 "cfs_score_e", "cfs_score_l", "cfs_score_s")),
-}
-
-BANK_BASE_NII_EVE_VIEW = """CREATE OR REPLACE VIEW risk.bank_base_nii_eve AS
-SELECT bank_id, as_of_date, nii, eve, updated_at
-FROM risk.interest_rate_scenario
-WHERE scenario_code = 'Base'"""
+_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_DEFAULT_OWNER = "dashboard"
 
 
 @dataclass(frozen=True)
@@ -88,44 +32,201 @@ class TargetTable:
     """One allowed write target; also the scope boundary for a dataset."""
 
     name: str
-    table: Table
+    table: Any
     grain: str
     dimension_column: str | None
     key_columns: tuple[str, ...]
     value_columns: tuple[str, ...]
     column_types: dict[str, str]
-    owner_dataset: str = "dashboard"
+    owner_dataset: str = _DEFAULT_OWNER
 
     @property
     def allowed_columns(self) -> frozenset[str]:
         return frozenset((*self.key_columns, *self.value_columns))
 
 
-def _build_target(name: str, grain: str, dimension_column: str | None,
-                  values: dict[str, str]) -> TargetTable:
-    schema, table_name = name.split(".", 1)
-    columns = [Column("bank_id", BigInteger, primary_key=True),
-               Column("as_of_date", Date, primary_key=True)]
-    types = {"bank_id": "BIGINT", "as_of_date": "DATE"}
-    keys = ["bank_id", "as_of_date"]
-    if dimension_column:
-        columns.append(Column(dimension_column, Text, primary_key=True))
-        types[dimension_column] = "TEXT"
-        keys.append(dimension_column)
-    for column_name, pg_type in values.items():
-        columns.append(Column(column_name, _TYPES[pg_type]))
-        types[column_name] = pg_type
-    columns.append(Column("updated_at", DateTime(timezone=True), nullable=False,
-                          server_default=func.now()))
-    types["updated_at"] = "TIMESTAMPTZ"
-    table = Table(table_name, business_metadata, *columns, schema=schema)
-    return TargetTable(name=name, table=table, grain=grain,
-                       dimension_column=dimension_column,
-                       key_columns=tuple(keys), value_columns=tuple(values),
-                       column_types=types)
+@dataclass(frozen=True)
+class Category:
+    """One L2 table classification from the registry."""
+
+    schema: str
+    domain: str
+    table: str
+    subcategory: str
+    grain: str
+    dimension_column: str | None
+    values: dict[str, str]
+    owner_dataset: str = _DEFAULT_OWNER
 
 
-TARGET_TABLES: dict[str, TargetTable] = {
-    name: _build_target(name, grain, dimension, values)
-    for name, (grain, dimension, values) in _TABLE_DEFS.items()
-}
+@dataclass(frozen=True)
+class CategoryRegistry:
+    """Everything derived from the registry file; injectable in tests."""
+
+    categories: tuple[Category, ...]
+    views: tuple[tuple[str, str], ...]
+    grains: tuple[str, ...]
+    strategy_grain: dict[str, str]
+    date_formats: dict[str, tuple[Callable[[Any], Any], bool]]
+
+
+def load_categories(path: str | Path = CATEGORIES_PATH) -> CategoryRegistry:
+    """Load and strictly validate the classification registry.
+
+    No DB connection is used. Validation fails fast with a precise error so a
+    bad registry can never silently produce a partial target model.
+    """
+    source = Path(path)
+    if not source.is_file():
+        raise ValueError(f"Categories file not found: {source}")
+    with source.open(encoding="utf-8") as stream:
+        obj = yaml.safe_load(stream)
+    if not isinstance(obj, dict) or "categories" not in obj:
+        raise ValueError("categories.yaml must define a 'categories' list")
+    if not isinstance(obj["categories"], list) or not obj["categories"]:
+        raise ValueError("'categories' must be a non-empty list")
+
+    owner_default = obj.get("owner_dataset", _DEFAULT_OWNER)
+    if not isinstance(owner_default, str) or not _IDENTIFIER.fullmatch(owner_default):
+        raise ValueError(f"unsafe owner_dataset {owner_default!r}")
+
+    grains_raw = obj.get("grains") or ()
+    if not isinstance(grains_raw, (list, tuple)):
+        raise ValueError("'grains' must be a list of {name, strategy}")
+    grains: list[str] = []
+    strategy_grain: dict[str, str] = {}
+    for index, item in enumerate(grains_raw):
+        label = f"grain {index + 1}"
+        if not isinstance(item, dict) or not item.get("name") or not item.get("strategy"):
+            raise ValueError(f"{label}: must define 'name' and 'strategy'")
+        name, strategy = str(item["name"]), str(item["strategy"])
+        if not _IDENTIFIER.fullmatch(name) or not _IDENTIFIER.fullmatch(strategy):
+            raise ValueError(f"{label}: unsafe grain/strategy name")
+        if name in grains or strategy in strategy_grain:
+            raise ValueError(f"{label}: duplicate grain or strategy")
+        grains.append(name)
+        strategy_grain[strategy] = name
+    if not grains:
+        raise ValueError("'grains' must declare at least one grain")
+
+    date_formats_raw = obj.get("date_formats") or ()
+    if not isinstance(date_formats_raw, dict):
+        raise ValueError("'date_formats' must be a mapping")
+    date_formats: dict[str, tuple[Callable[[Any], Any], bool]] = {}
+    for name, spec in date_formats_raw.items():
+        if not _IDENTIFIER.fullmatch(str(name)):
+            raise ValueError(f"unsafe date_format name {name!r}")
+        date_formats[str(name)] = build_date_format(spec, f"date format {name!r}")
+    if not date_formats:
+        raise ValueError("'date_formats' must declare at least one format")
+
+    categories: list[Category] = []
+    seen: set[str] = set()
+    for index, raw in enumerate(obj["categories"]):
+        label = f"category {index + 1}"
+        if not isinstance(raw, dict):
+            raise ValueError(f"{label}: must be a mapping")
+        required = ("schema", "domain", "table", "subcategory", "grain", "values")
+        missing = [key for key in required if key not in raw]
+        if missing:
+            raise ValueError(f"{label}: missing {sorted(missing)}")
+        name = raw["table"]
+        if not isinstance(name, str) or name.count(".") != 1:
+            raise ValueError(f"{label}: table must be 'schema.table': {name!r}")
+        schema, table_name = name.split(".", 1)
+        if schema != raw["schema"]:
+            raise ValueError(f"{label}: table prefix must match schema {raw['schema']!r}")
+        for value, field in ((schema, "schema"), (table_name, "table name")):
+            if not _IDENTIFIER.fullmatch(str(value)):
+                raise ValueError(f"{label}: unsafe {field} {value!r}")
+        if raw["grain"] not in grains:
+            raise ValueError(f"{label}: grain {raw['grain']!r} is not declared in 'grains'")
+        dimension = raw.get("dimension")
+        if (raw["grain"] == "single_row") != (dimension is None):
+            raise ValueError(
+                f"{label}: 'dimension' must be set if and only if grain is an unpivot")
+        if dimension is not None and not _IDENTIFIER.fullmatch(str(dimension)):
+            raise ValueError(f"{label}: unsafe dimension {dimension!r}")
+        values = raw["values"]
+        if not isinstance(values, dict) or not values:
+            raise ValueError(f"{label}: values must be a non-empty mapping")
+        for column, pg_type in values.items():
+            if not _IDENTIFIER.fullmatch(str(column)):
+                raise ValueError(f"{label}: unsafe value column {column!r}")
+            if pg_type not in SQL_TYPES:
+                raise ValueError(f"{label}: unsupported type {pg_type!r} for {column!r}")
+        if name in seen:
+            raise ValueError(f"{label}: duplicate table {name!r}")
+        seen.add(name)
+        owner = str(raw.get("owner_dataset", owner_default))
+        if not _IDENTIFIER.fullmatch(owner):
+            raise ValueError(f"{label}: unsafe owner_dataset {owner!r}")
+        if "owner_dataset" in raw and owner != raw["owner_dataset"]:
+            raise ValueError(f"{label}: owner_dataset must be a plain identifier")
+        categories.append(Category(
+            schema=schema, domain=str(raw["domain"]), table=name,
+            subcategory=str(raw["subcategory"]), grain=str(raw["grain"]),
+            dimension_column=dimension, values=dict(values), owner_dataset=owner,
+        ))
+
+    views: list[tuple[str, str]] = []
+    for index, raw in enumerate(obj.get("views") or ()):
+        label = f"view {index + 1}"
+        if not isinstance(raw, dict) or not raw.get("name") or not raw.get("sql"):
+            raise ValueError(f"{label}: must define 'name' and 'sql'")
+        views.append((str(raw["name"]), str(raw["sql"])))
+    return CategoryRegistry(
+        categories=tuple(categories), views=tuple(views),
+        grains=tuple(grains), strategy_grain=strategy_grain,
+        date_formats=date_formats,
+    )
+
+
+def build_targets(categories: tuple[Category, ...] | list[Category],
+                  metadata: MetaData | None = None) -> dict[str, Any]:
+    """Build SQLAlchemy targets from a validated category tuple."""
+    from sqlalchemy import BigInteger, Column, Date, DateTime, Text, func
+
+    meta = business_metadata if metadata is None else metadata
+    targets: dict[str, TargetTable] = {}
+    for category in categories:
+        name = category.table
+        schema, table_name = name.split(".", 1)
+        columns = [Column("bank_id", BigInteger, primary_key=True),
+                   Column("as_of_date", Date, primary_key=True)]
+        types = {"bank_id": "BIGINT", "as_of_date": "DATE"}
+        keys = ["bank_id", "as_of_date"]
+        if category.dimension_column:
+            columns.append(Column(category.dimension_column, Text, primary_key=True))
+            types[category.dimension_column] = "TEXT"
+            keys.append(category.dimension_column)
+        for column_name, pg_type in category.values.items():
+            declared = SQL_TYPES[pg_type]
+            column_type = declared() if isinstance(declared, type) else declared
+            columns.append(Column(column_name, column_type))
+            types[column_name] = pg_type
+        columns.append(Column("updated_at", DateTime(timezone=True), nullable=False,
+                              server_default=func.now()))
+        types["updated_at"] = "TIMESTAMPTZ"
+        table = Table(table_name, meta, *columns, schema=schema)
+        targets[name] = TargetTable(
+            name=name, table=table, grain=category.grain,
+            dimension_column=category.dimension_column,
+            key_columns=tuple(keys), value_columns=tuple(category.values),
+            column_types=types, owner_dataset=category.owner_dataset,
+        )
+    return targets
+
+
+REGISTRY = load_categories()
+CATEGORIES: tuple[Category, ...] = REGISTRY.categories
+CATEGORY_VIEWS: tuple[tuple[str, str], ...] = REGISTRY.views
+GRAINS: tuple[str, ...] = REGISTRY.grains
+STRATEGY_GRAIN: dict[str, str] = REGISTRY.strategy_grain
+DATE_FORMATS: dict[str, tuple[Callable[[Any], Any], bool]] = REGISTRY.date_formats
+SCHEMAS: tuple[str, ...] = tuple(dict.fromkeys(c.schema for c in CATEGORIES))
+CATEGORY_BY_TABLE: dict[str, Category] = {c.table: c for c in CATEGORIES}
+TARGET_TABLES: dict[str, TargetTable] = build_targets(CATEGORIES)
+
+# Backward-compatible alias used by older callers.
+BANK_BASE_NII_EVE_VIEW: str = dict(CATEGORY_VIEWS)["risk.bank_base_nii_eve"]

@@ -10,9 +10,11 @@ from sqlalchemy.engine import Engine, URL
 from sqlalchemy.exc import NoSuchTableError
 
 from bank_etl.config import DatasetSpec, TableSpec, safe_identifier
+from bank_etl.models import DATE_FORMATS
 from bank_etl.transform import as_of_parameter, coerce_date
 
-RANGE_DATE_FORMATS = ("datetime", "date")
+RANGE_DATE_FORMATS = tuple(name for name, (_, supports_range)
+                           in DATE_FORMATS.items() if supports_range)
 
 
 class MultipleSourceRecordsError(RuntimeError):

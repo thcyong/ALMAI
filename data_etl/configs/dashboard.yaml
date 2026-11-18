@@ -1,5 +1,5 @@
 dataset: dashboard
-mapping_file: dashboard_field_mapping.csv
+mapping_file: dashboard_field_mapping.yaml
 
 table:
   name: dbo.BankAnalyzingWatches

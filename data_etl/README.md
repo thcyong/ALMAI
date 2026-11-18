@@ -10,7 +10,7 @@ Only the **latest** data is kept: the 12 tables for the same `BankID + AsOfDate`
 - Microsoft ODBC Driver 17/18; PostgreSQL 14+.
 - Dependencies are declared in `pyproject.toml` (CLI script entry points removed).
 
-Configure `DEV_SQLSERVER_*` and `AI_POSTGRES_URL` in the shared root `.env`; `.env` is already ignored by `.gitignore`. `configs/dashboard.yaml` points to `configs/dashboard_field_mapping.csv`, which is the single field definition.
+Configure `DEV_SQLSERVER_*` and `AI_POSTGRES_URL` in the shared root `.env`; `.env` is already ignored by `.gitignore`. `configs/dashboard.yaml` points to `configs/dashboard_field_mapping.yaml`, which is the single field definition.
 
 ## 2. Running
 
@@ -32,11 +32,41 @@ Inside `sync`, tables are created idempotently before writing (schema, 12 busine
 
 The `data/` directory keeps the original design artifacts (`dashboard_banking_schema.sql`, `dashboard_field_catalog.xlsx`, `dashboard_design_notes.md`, `dashboard_sample_seed.sql`) for offline reference only; they are not the ETL data source.
 
-## 3. YAML and Field Mapping
+## 3. Classification Registry and Expansion
+
+`configs/categories.yaml` is the single source of truth for the AI-database
+target model. It declares a three-level taxonomy:
+
+- **schema** (L1 big category): `core`, `finance`, `risk`, `analysis`;
+- **domain** (business group, e.g. `Interest Rate Risk`);
+- **table** (L2 small category, e.g. `risk.interest_rate_scenario`) with a
+  `subcategory` label, a writer `grain` and its value columns/types.
+
+The same file also declares `owner_dataset`, `grains` (writer grain to mapping
+strategy) and `date_formats` (source as-of storage format, including `strftime`
+patterns and `range: true` for backfill), plus `views` such as
+`risk.bank_base_nii_eve`. At import time `models.py` derives `SCHEMAS`,
+`CATEGORY_BY_TABLE`, `TARGET_TABLES`, `STRATEGY_GRAIN`, `DATE_FORMATS` and the
+view list from the file; `postgres.py` creates missing tables, adds new value
+columns with `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`, and honours each
+table's `owner_dataset`. `mapping.py` checks each field's
+`domain`/`subcategory` against the registry entry, so classification cannot
+drift silently. Supported column types live in `bank_etl/field_types.py`
+(`NUMERIC`, `BIGINT`, `INTEGER`, `DATE`, `TIMESTAMP`, `TEXT`, `BOOLEAN`), with
+matching value converters in the same module.
+
+To add a new classification: add a `categories` entry (and optionally new
+`grains`, `date_formats` or `views`) in `configs/categories.yaml`, then add the
+corresponding field
+under its target-table group in `configs/dashboard_field_mapping.yaml`. New
+columns on existing tables are added on the next sync; removing objects is
+intentionally not automated.
+
+## 4. YAML and Field Mapping
 
 ```yaml
 dataset: dashboard
-mapping_file: dashboard_field_mapping.csv
+mapping_file: dashboard_field_mapping.yaml
 
 table:
   name: dbo.BankAnalyzingWatches
@@ -52,20 +82,34 @@ table:
     w.RevisionID: 0
 ```
 
-`mapping_file` is only allowed to point to a relative path inside the project's `configs/` directory (absolute paths and `..` are rejected). `configs/dashboard_field_mapping.csv` has these key columns:
+`mapping_file` is only allowed to point to a relative path inside the project's `configs/` directory (absolute paths and `..` are rejected). `configs/dashboard_field_mapping.yaml` is a **grouped YAML**: each group under `groups` declares table-level attributes inherited by every field in that group, and `fields` lists per-field overrides.
 
-| Column | Description |
-|---|---|
-| `dev_field` / `source_alias` | Source column name and owning table alias; 329 fields are in `d`, `BankID` / `asof` are in `w`, `ID` is explicitly bound to `d.ID` |
-| `target_table` / `target_column` | Target table and column, must exist in the `models.py` whitelist |
-| `mapping` | `direct` / `scenario_unpivot` / `sector_unpivot` |
-| `dimension` / `code` | Dimension column (`scenario_code` / `sector_code`) and dimension value of the unpivoted table |
-| `pg_type` | Target column type, verified column-by-column against the model at load time |
-| `confidence` / `notes` | Financial-caliber to-be-confirmed markers (235 fields marked `to_be_verified`) |
+| Key | Level | Description |
+|---|---|---|
+| `domain` / `subcategory` | group | Must match the `categories.yaml` entry for `target_table` |
+| `target_table` | group | Target table, must exist in the derived target registry |
+| `mapping` | group | `direct` / `scenario_unpivot` / `sector_unpivot` |
+| `dimension` / `source_alias` / `pg_type` / `confidence` / `notes` | group or field | Inherited from the group; a field entry may override each one |
+| `dev_field` / `target_column` | field | Source column name and target column (both required) |
+| `code` | field | Dimension value (`scenario_code` / `sector_code`) for unpivot groups |
 
-Strict validation at load: 331 source fields are unique, target cells are unique, strategy matches table grain, the dimension matrix is complete (12 Scenario × 15 columns, 15 Sector × 5 columns), and identifiers are safe. `asof` is normalized from Dev's `DATETIME` to `DATE` and must match the requested date; a mismatch raises an error and writes nothing to PostgreSQL.
+329 fields use source alias `d`, `BankID` / `asof` use `w`, and `ID` is explicitly bound to `d.ID`. A minimal group looks like:
 
-## 4. Four Schemas Classified by Financial Meaning
+```yaml
+groups:
+  - domain: "Interest Rate Risk"
+    subcategory: "Interest Rate Scenario Results"
+    target_table: risk.interest_rate_scenario
+    mapping: scenario_unpivot
+    dimension: scenario_code
+    pg_type: NUMERIC
+    fields:
+      - {dev_field: NIIs_Base, target_column: nii, code: Base}
+```
+
+Strict validation at load: all source fields are unique, target cells are unique, strategy matches table grain, the dimension matrix is complete (12 Scenario × 15 columns, 15 Sector × 5 columns), identifiers are safe, and group labels match the registry. `asof` is normalized from Dev's `DATETIME` to `DATE` and must match the requested date; a mismatch raises an error and writes nothing to PostgreSQL.
+
+## 5. Four Schemas Classified by Financial Meaning
 
 |---|---|
 | `core` | Bank base information |
@@ -73,7 +117,7 @@ Strict validation at load: 331 source fields are unique, target cells are unique
 | `risk` | Interest-rate risk, liquidity and other financial risks |
 | `analysis` | CAMELS and other analysis results |
 
-## 5. 12 Business Tables and Write Rules
+## 6. 12 Business Tables and Write Rules
 
 | Table | Grain |
 |---|---|
@@ -101,7 +145,7 @@ Write rules:
 - No financial recomputation: NULL, 0 and negative values are kept as-is — no absolute value, no percentage/unit conversion, no merging of different calibers such as `NIIs_Base`/`AdjNIIs_Base`/`IA_NII`/`NII24s_Base`.
 - All numeric columns are `NUMERIC`; `FLOAT` sources are written with driver-visible decimal `Decimal(str(v))`, without claiming to recover precision that does not exist at source.
 
-## 6. Tests
+## 7. Tests
 
 ```bash
 python -m unittest discover -s tests -v
@@ -109,7 +153,7 @@ python -m unittest discover -s tests -v
 
 `tests/test_etl.py` covers mapping validation, the 331-column SQL Builder, the three conversion strategies, Decimal/NULL/0/negative, identity consistency, the 12-table transaction and rollback, Scenario/Sector non-misalignment, and bank/date isolation with no history table. PostgreSQL cases run only when `AI_ETL_TEST_POSTGRES_URL` is set (must point to an isolated database; the test rebuilds the 12 tables per the current model), otherwise they are skipped.
 
-## 7. Retiring the legacy `finance.metric_value`
+## 8. Retiring the legacy `finance.metric_value`
 
 The new ETL no longer reads or writes the legacy table, but **does not auto-delete** it. Follow this order:
 
@@ -119,7 +163,7 @@ The new ETL no longer reads or writes the legacy table, but **does not auto-dele
 4. Backup: `pg_dump -t finance.metric_value --data-only <ai_database> > metric_value_backup.sql`.
 5. Have an authorized person run `sql/drop_legacy_metric_value.sql` separately (it includes its own view-dependency and precondition guards).
 
-## 8. To-Be-Confirmed and Limitations
+## 9. To-Be-Confirmed and Limitations
 
 - The financial caliber of 235 fields is marked `to_be_verified` (NLL, STI, RSAL, PaR, Ex, Adj, GapAssetNonsens, NCUA_*, Duration, Rate/Ratio units, etc.); currently only the original values are stored, with no interpretation or computation.
 - `RevisionID` is fixed at 0; one `BankID + AsOfDate` may correspond to only one source record — multiple rows raise an error, and `TOP 1` is not used.

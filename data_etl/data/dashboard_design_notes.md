@@ -25,7 +25,7 @@ The 180 `indicator_scenario` columns are unpivoted into multiple rows of `risk.i
 ## Files and Execution Order
 
 1. `dashboard_banking_schema.sql`: 12 PostgreSQL business tables + 1 Base NII/EVE query view; only creates objects, does not drop existing tables.
-2. `dashboard_field_catalog.xlsx` / `dashboard_field_mapping.csv`: mapping, sample values, classification and financial-caliber to-be-confirmed items for all 331 columns.
+2. `dashboard_field_catalog.xlsx` / `dashboard_field_mapping.csv`: original design-package mapping (offline reference). The live ETL uses `configs/dashboard_field_mapping.yaml` as the grouped-YAML mapping source.
 3. `dashboard_sample_seed.sql`: a demo script that loads the Excel's single-row data into the new structure; requires the table-creation SQL to run first. **Demo data does not represent the latest Dev data.**
 
 Usage: `psql -v ON_ERROR_STOP=1 -d <ai_database> -f dashboard_banking_schema.sql`, then run the seed in an isolated test database. Do not run the seed directly in production to replace real sync results.

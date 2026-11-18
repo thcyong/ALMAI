@@ -24,7 +24,9 @@ TEST_AS_OF = date(2026, 6, 30)
 
 if __name__ == "__main__":
     load_dotenv(Path(__file__).resolve().parents[1] / ".env")
-    spec = load_dataset("configs/dashboard.yaml")
+    # Use a path relative to this file, not the current working directory, so
+    # F5 works when VS Code launches from the repository root.
+    spec = load_dataset(Path(__file__).resolve().parent / "configs" / "dashboard.yaml")
     source = create_source_engine()
     ai = create_ai_engine()
     try:

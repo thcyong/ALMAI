@@ -3,7 +3,7 @@
 A dataset is described by:
 
     dataset: dashboard
-    mapping_file: dashboard_field_mapping.csv
+    mapping_file: dashboard_field_mapping.yaml
     table: dbo.SomeTable            # single table shorthand
     # or
     table:
@@ -33,10 +33,11 @@ from typing import Any
 import yaml
 
 from bank_etl.mapping import FieldMapping, load_field_mapping
-from bank_etl.models import TARGET_TABLES
+from bank_etl.models import (CATEGORY_BY_TABLE, CONFIGS_ROOT, DATE_FORMATS,
+                             STRATEGY_GRAIN, TARGET_TABLES, Category, TargetTable)
 
 _ID = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
-_CONFIGS_ROOT = Path(__file__).resolve().parents[2] / "configs"
+_CONFIGS_ROOT = CONFIGS_ROOT
 
 
 class _DatasetLoader(yaml.SafeLoader):
@@ -72,7 +73,7 @@ _DatasetLoader.add_implicit_resolver(
 )
 
 _DEFAULT_ALIAS = "t"
-_DATE_FORMATS = ("datetime", "date", "yyyymmdd_int", "yyyymmdd_text", "iso_text")
+_DATE_FORMATS = tuple(DATE_FORMATS)
 _SQL_SNIPPETS = (";", "--", "/*", "*/")
 
 DATASET_KEYS = {"dataset", "table", "mapping_file"}
@@ -240,7 +241,7 @@ def _parse_join(raw: Any, declared: set[str]) -> JoinSpec:
     return JoinSpec(table=table, alias=alias, left=left, right=right)
 
 
-def _parse_table(raw: Any) -> TableSpec:
+def _parse_table(raw: Any, date_formats: tuple[str, ...] | None = None) -> TableSpec:
     if isinstance(raw, str):
         main = _split_table_name(raw)
         alias = _DEFAULT_ALIAS
@@ -267,9 +268,10 @@ def _parse_table(raw: Any) -> TableSpec:
     def ref(key: str, default: str) -> ColumnRef:
         return parse_column_ref(raw.get(key, default), alias, f"table.{key}")
 
+    formats = _DATE_FORMATS if date_formats is None else date_formats
     date_format = raw.get("date_format", "datetime")
-    if date_format not in _DATE_FORMATS:
-        raise ValueError(f"Unknown date_format: {date_format!r}; use one of {_DATE_FORMATS}")
+    if date_format not in formats:
+        raise ValueError(f"Unknown date_format: {date_format!r}; use one of {formats}")
     table = TableSpec(
         name=main, alias=alias, joins=tuple(joins),
         bank_id=ref("bank_id", "BankID"),
@@ -299,8 +301,16 @@ def _resolve_mapping_file(yaml_path: Path, value: Any) -> Path:
     return target
 
 
-def load_dataset(path: str | Path) -> DatasetSpec:
-    """Load and strictly validate a YAML contract and its field mapping."""
+def load_dataset(path: str | Path, *,
+                 categories: dict[str, Category] | None = None,
+                 targets: dict[str, TargetTable] | None = None,
+                 strategy_grain: dict[str, str] | None = None) -> DatasetSpec:
+    """Load and strictly validate a YAML contract and its field mapping.
+
+    ``categories``/``targets``/``strategy_grain`` default to the registry-derived
+    module globals; tests may inject alternate registries to verify config-only
+    expansion.
+    """
     yaml_path = Path(path)
     with yaml_path.open(encoding="utf-8") as stream:
         obj = yaml.load(stream, Loader=_DatasetLoader)
@@ -314,9 +324,14 @@ def load_dataset(path: str | Path) -> DatasetSpec:
         raise ValueError("dataset is required and must be a non-empty string")
     if "table" not in obj:
         raise ValueError("table is required")
-    table = _parse_table(obj["table"])
+    table = _parse_table(obj["table"], tuple(DATE_FORMATS))
     mapping_path = _resolve_mapping_file(yaml_path, obj.get("mapping_file"))
-    mapping = load_field_mapping(mapping_path, set(table.aliases), TARGET_TABLES)
+    active_targets = TARGET_TABLES if targets is None else targets
+    active_categories = CATEGORY_BY_TABLE if categories is None else categories
+    active_strategies = STRATEGY_GRAIN if strategy_grain is None else strategy_grain
+    mapping = load_field_mapping(mapping_path, set(table.aliases),
+                                 active_targets, active_categories,
+                                 active_strategies)
     bindings = tuple(
         FieldBinding(output_alias=rule.output_alias,
                      ref=ColumnRef(rule.source_alias, rule.dev_field),
