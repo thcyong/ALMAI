@@ -115,10 +115,35 @@
 
     footer {
       display: flex;
+      flex-direction: column;
       gap: .6rem;
       padding: .8rem 1.2rem;
       border-top: 1px solid var(--border);
     }
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      flex-wrap: wrap;
+    }
+    .controls label {
+      font-size: .8rem;
+      color: var(--muted);
+    }
+    .controls input, #preset {
+      padding: .45rem .6rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: .82rem;
+      background: #fff;
+      color: var(--text);
+      outline: none;
+    }
+    #bankInput { width: 88px; }
+    #dateInput { width: 128px; }
+    #preset { flex: 1; min-width: 220px; cursor: pointer; }
+    .controls input:focus, #preset:focus { border-color: var(--brand); }
+    .inputrow { display: flex; gap: .6rem; }
     #msg {
       flex: 1;
       padding: .7rem .9rem;
@@ -137,6 +162,19 @@
       font-size: .95rem;
       cursor: pointer;
     }
+    button.secondary {
+      padding: .45rem .75rem;
+      font-size: .82rem;
+      background: #e8eef6;
+      color: var(--user-text);
+    }
+    button.ghost {
+      padding: .45rem .75rem;
+      font-size: .82rem;
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
     button:disabled { opacity: .55; cursor: default; }
   </style>
 </head>
@@ -154,9 +192,53 @@
     <div id="log"></div>
 
     <footer>
-      <input id="msg" placeholder="e.g. Base NII for bank -48858 on 2026-06-30"
-             autocomplete="off" onkeydown="if(event.key==='Enter')send()">
-      <button id="sendBtn" onclick="send()">Send</button>
+      <div class="controls">
+        <label for="bankInput">Bank ID</label>
+        <input id="bankInput" value="-48599" autocomplete="off">
+        <span style="color:gray;font-size: 11px;">( -48858/-48599 )</span>
+        <label for="dateInput">Date</label>
+        <input id="dateInput" value="2026-06-30" autocomplete="off">
+        <button class="secondary" onclick="setContext()">Set context</button>
+        <button class="ghost" onclick="clearChat()">Clear</button>
+      </div>
+      <div class="controls">
+        <label for="preset">Presets</label>
+        <select id="preset" onchange="usePreset()">
+          <option value="">— choose a preset prompt —</option>
+          <optgroup label="0. Setup (run once)">
+            <option value="__CONTEXT__">Set bank id and reporting date for all following questions</option>
+          </optgroup>
+          <optgroup label="A. Single metric">
+            <option value="What is the Base NII?">What is the Base NII?</option>
+            <option value="What is the U200 NII?">What is the U200 NII?</option>
+            <option value="Show me the Base EVE.">Show me the Base EVE.</option>
+            <option value="What is the ROA?">What is the ROA?</option>
+            <option value="Give me the Tier1 capital.">Give me the Tier1 capital.</option>
+          </optgroup>
+          <optgroup label="B. Scenario analysis">
+            <option value="Compare Base NII and U200 NII. What happens under a +200bp rate shock?">Compare Base NII and U200 NII. What happens under a +200bp rate shock?</option>
+            <option value="How sensitive is the NII to rising rates?">How sensitive is the NII to rising rates?</option>
+            <option value="What does the Base EVE tell us about the interest-rate risk?">What does the Base EVE tell us about the interest-rate risk?</option>
+          </optgroup>
+          <optgroup label="C. Business / impact">
+            <option value="Analyze the ROA and explain what it says about profitability.">Analyze the ROA and explain what it says about profitability.</option>
+            <option value="How does the Tier1 capital affect the bank's solvency?">How does the Tier1 capital affect the bank's solvency?</option>
+            <option value="Give a brief financial-health assessment using NII, ROA and Tier1 capital, and flag the main risks.">Financial-health assessment using NII, ROA and Tier1 capital</option>
+            <option value="Given the NII under stress and the current capital level, what is the likely impact on earnings?">Likely earnings impact from stressed NII and capital</option>
+          </optgroup>
+          <optgroup label="D. Clarification / negative">
+            <option value="What is the NII?">What is the NII? (ambiguous scenario)</option>
+            <option value="Tell me about the bank.">Tell me about the bank. (no metric)</option>
+            <option value="What is the U200 EVE?">What is the U200 EVE? (not configured)</option>
+            <option value="What is the CAMELS score?">What is the CAMELS score? (not configured)</option>
+          </optgroup>
+        </select>
+      </div>
+      <div class="inputrow">
+        <input id="msg" placeholder="Ask a question (preset prompts do not need bank id or date)"
+               autocomplete="off" onkeydown="if(event.key==='Enter')send()">
+        <button id="sendBtn" onclick="send()">Send</button>
+      </div>
     </footer>
   </div>
 
@@ -164,7 +246,42 @@
     const log = document.getElementById('log');
     const input = document.getElementById('msg');
     const sendBtn = document.getElementById('sendBtn');
+    const preset = document.getElementById('preset');
+    const bankInput = document.getElementById('bankInput');
+    const dateInput = document.getElementById('dateInput');
+    const CONTEXT_TEMPLATE =
+      'My bank id is {bank} and the reporting date is {date}. From now on, ' +
+      'always use this bank and this date for every question unless I explicitly ' +
+      'say otherwise.';
     let history = [];
+
+    function contextText() {
+      return CONTEXT_TEMPLATE.replace('{bank}', bankInput.value.trim())
+                             .replace('{date}', dateInput.value.trim());
+    }
+
+    function setContext() {
+      const bank = bankInput.value.trim();
+      const date = dateInput.value.trim();
+      if (!bank || !date) return;
+      input.value = contextText();
+      send();
+    }
+
+    function usePreset() {
+      const value = preset.value;
+      if (!value) return;
+      input.value = value === '__CONTEXT__' ? contextText() : value;
+      input.focus();
+    }
+
+    function clearChat() {
+      log.innerHTML = '';
+      history = [];
+      preset.value = '';
+      input.value = '';
+      input.focus();
+    }
 
     const ICON_BOT =
       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +

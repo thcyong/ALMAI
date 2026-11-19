@@ -9,6 +9,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from sympy import true
+
 # Ensure the repo root (containing ontology/ and financial_query/) is importable.
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -48,5 +50,5 @@ if __name__ == "__main__":
 
     # Launch directly (e.g. via VS Code F5) on the same port as the
     # documented "uvicorn chat.app:app --reload --port 8000" command.
-    # reload=False keeps breakpoints working under the debugger.
-    uvicorn.run(app, host="0.0.0.0", port=8000, reload=False)
+    # reload=True requires an import string, not the app object.
+    uvicorn.run("chat.app:app", host="0.0.0.0", port=8000, reload=True)

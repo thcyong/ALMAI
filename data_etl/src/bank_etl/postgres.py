@@ -96,8 +96,7 @@ def apply_schema_plan(engine: Engine, plan: Mapping[str, Any],
             for schema in plan["create_schemas"]:
                 conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema}"))
     if plan["create_tables"]:
-        active_targets = plan.get("targets", TARGET_TABLES)
-        tables: list[_Table] = [active_targets[name].table
+        tables: list[_Table] = [TARGET_TABLES[name].table
                                 for name in plan["create_tables"]]
         business_metadata.create_all(engine, tables=tables)
     with engine.begin() as conn:
